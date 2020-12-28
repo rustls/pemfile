@@ -1,0 +1,39 @@
+on: [push, pull_request]
+name: rustls-pemfile
+
+jobs:
+  build:
+    name: "Build and test"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        # test a bunch of toolchains on ubuntu
+        rust:
+          - stable
+          - beta
+          - nightly
+        os: [ubuntu-18.04]
+        # but only stable on macos/windows (slower platforms)
+        include:
+          - os: macos-latest
+            rust: stable
+          - os: windows-latest
+            rust: stable
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install ${{ matrix.rust }} toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust }}
+          override: true
+
+      - name: cargo test (debug)
+        run: cargo test
+        env:
+          RUST_BACKTRACE: 1
+
+      - name: cargo test (release)
+        run: cargo test --release
+
