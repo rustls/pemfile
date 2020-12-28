@@ -9,7 +9,7 @@ poor and doing so doesn't address a meaningful threat model.
 [![Documentation](https://docs.rs/rustls-pemfile/badge.svg)](https://docs.rs/rustls-pemfile/)
 
 # Release history
-- 0.1.0 (2020-xx-xx)
+- 0.2.0 (2020-12-28)
   * Initial release.
 
 # License
