@@ -34,7 +34,7 @@ impl Item {
 /// You can use this function to build an iterator, for example:
 /// `for item in iter::from_fn(|| read_one(rd).transpose()) { ... }`
 pub fn read_one(rd: &mut dyn io::BufRead) -> Result<Option<Item>, io::Error> {
-    let mut b64buf = String::new();
+    let mut b64buf = String::with_capacity(1024);
     let mut section_type = None;
     let mut end_marker = None;
     let mut line = String::with_capacity(80);
