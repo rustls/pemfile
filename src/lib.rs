@@ -23,6 +23,7 @@
 //!         Item::X509Certificate(cert) => println!("certificate {:?}", cert),
 //!         Item::RSAKey(key) => println!("rsa pkcs1 key {:?}", key),
 //!         Item::PKCS8Key(key) => println!("pkcs8 key {:?}", key),
+//!         Item::ECKey(key) => println!("ec key {:?}", key),
 //!     }
 //! }
 //! ```
@@ -41,15 +42,9 @@
 #[cfg(test)]
 mod tests;
 
-
 /// --- Main crate APIs:
-
 mod pemfile;
-pub use pemfile::{
-    Item,
-    read_one,
-    read_all,
-};
+pub use pemfile::{read_all, read_one, Item};
 
 /// --- Legacy APIs:
 use std::io;
@@ -88,6 +83,23 @@ pub fn rsa_private_keys(rd: &mut dyn io::BufRead) -> Result<Vec<Vec<u8>>, io::Er
     }
 }
 
+/// Extract all EC private keys from `rd`, and return a vec of byte vecs
+/// containing the der-format contents.
+///
+/// This function does not fail if there are no keys in the file -- it returns an
+/// empty vector.
+pub fn ec_private_keys(rd: &mut dyn io::BufRead) -> Result<Vec<Vec<u8>>, io::Error> {
+    let mut keys = Vec::<Vec<u8>>::new();
+
+    loop {
+        match read_one(rd)? {
+            None => return Ok(keys),
+            Some(Item::ECKey(key)) => keys.push(key),
+            _ => {}
+        };
+    }
+}
+
 /// Extract all PKCS8-encoded private keys from `rd`, and return a vec of
 /// byte vecs containing the der-format contents.
 ///
@@ -104,4 +116,3 @@ pub fn pkcs8_private_keys(rd: &mut dyn io::BufRead) -> Result<Vec<Vec<u8>>, io::
         };
     }
 }
-
