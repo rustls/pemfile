@@ -12,6 +12,9 @@ pub enum Item {
 
     /// A DER-encoded plaintext private key; as specified in PKCS#8/RFC5958
     PKCS8Key(Vec<u8>),
+
+    /// A Sec1-encoded plaintext private key; as specified in RFC5915
+    ECKey(Vec<u8>),
 }
 
 impl Item {
@@ -20,6 +23,7 @@ impl Item {
             "CERTIFICATE" => Some(Item::X509Certificate(der)),
             "RSA PRIVATE KEY" => Some(Item::RSAKey(der)),
             "PRIVATE KEY" => Some(Item::PKCS8Key(der)),
+            "EC PRIVATE KEY" => Some(Item::ECKey(der)),
             _ => None,
         }
     }
