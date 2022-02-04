@@ -2,6 +2,7 @@ use base64;
 use std::io::{self, ErrorKind};
 
 /// The contents of a single recognised block in a PEM file.
+#[non_exhaustive]
 #[derive(Debug, PartialEq)]
 pub enum Item {
     /// A DER-encoded x509 certificate.
