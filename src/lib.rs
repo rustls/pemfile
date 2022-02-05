@@ -23,6 +23,7 @@
 //!         Item::X509Certificate(cert) => println!("certificate {:?}", cert),
 //!         Item::RSAKey(key) => println!("rsa pkcs1 key {:?}", key),
 //!         Item::PKCS8Key(key) => println!("pkcs8 key {:?}", key),
+//!         _ => println!("unsupported PEM payload"),
 //!     }
 //! }
 //! ```
@@ -41,15 +42,9 @@
 #[cfg(test)]
 mod tests;
 
-
 /// --- Main crate APIs:
-
 mod pemfile;
-pub use pemfile::{
-    Item,
-    read_one,
-    read_all,
-};
+pub use pemfile::{read_all, read_one, Item};
 
 /// --- Legacy APIs:
 use std::io;
@@ -104,4 +99,3 @@ pub fn pkcs8_private_keys(rd: &mut dyn io::BufRead) -> Result<Vec<Vec<u8>>, io::
         };
     }
 }
-
