@@ -23,6 +23,8 @@
 //!         Item::X509Certificate(cert) => println!("certificate {:?}", cert),
 //!         Item::RSAKey(key) => println!("rsa pkcs1 key {:?}", key),
 //!         Item::PKCS8Key(key) => println!("pkcs8 key {:?}", key),
+//!         Item::ECKey(key) => println!("sec1 ec key {:?}", key),
+//!         _ => println!("unhandled item"),
 //!     }
 //! }
 //! ```
