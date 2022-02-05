@@ -6,8 +6,12 @@ fn test_rsa_private_keys() {
     let data = include_bytes!("data/zen2.pem");
     let mut reader = BufReader::new(&data[..]);
 
-    assert_eq!(rustls_pemfile::rsa_private_keys(&mut reader).unwrap().len(),
-               2);
+    assert_eq!(
+        rustls_pemfile::rsa_private_keys(&mut reader)
+            .unwrap()
+            .len(),
+        2
+    );
 }
 
 #[test]
@@ -15,8 +19,12 @@ fn test_certs() {
     let data = include_bytes!("data/certificate.chain.pem");
     let mut reader = BufReader::new(&data[..]);
 
-    assert_eq!(rustls_pemfile::certs(&mut reader).unwrap().len(),
-               3);
+    assert_eq!(
+        rustls_pemfile::certs(&mut reader)
+            .unwrap()
+            .len(),
+        3
+    );
 }
 
 #[test]
@@ -24,8 +32,12 @@ fn test_pkcs8() {
     let data = include_bytes!("data/zen.pem");
     let mut reader = BufReader::new(&data[..]);
 
-    assert_eq!(rustls_pemfile::pkcs8_private_keys(&mut reader).unwrap().len(),
-               2);
+    assert_eq!(
+        rustls_pemfile::pkcs8_private_keys(&mut reader)
+            .unwrap()
+            .len(),
+        2
+    );
 }
 
 #[test]
@@ -58,8 +70,7 @@ fn parse_in_order() {
     let data = include_bytes!("data/zen.pem");
     let mut reader = BufReader::new(&data[..]);
 
-    let items = rustls_pemfile::read_all(&mut reader)
-        .unwrap();
+    let items = rustls_pemfile::read_all(&mut reader).unwrap();
     assert_eq!(items.len(), 8);
     assert!(matches!(items[0], rustls_pemfile::Item::X509Certificate(_)));
     assert!(matches!(items[1], rustls_pemfile::Item::X509Certificate(_)));

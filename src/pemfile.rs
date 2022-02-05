@@ -51,16 +51,25 @@ pub fn read_one(rd: &mut dyn io::BufRead) -> Result<Option<Item>, io::Error> {
         if len == 0 {
             // EOF
             if end_marker.is_some() {
-                return Err(io::Error::new(ErrorKind::InvalidData, format!("section end {:?} missing", end_marker.unwrap())));
+                return Err(io::Error::new(
+                    ErrorKind::InvalidData,
+                    format!("section end {:?} missing", end_marker.unwrap()),
+                ));
             }
             return Ok(None);
         }
 
         if line.starts_with("-----BEGIN ") {
-            let trailer = line[11..].find("-----")
-                .ok_or_else(|| io::Error::new(ErrorKind::InvalidData, format!("illegal section start: {:?}", line)))?;
+            let trailer = line[11..]
+                .find("-----")
+                .ok_or_else(|| {
+                    io::Error::new(
+                        ErrorKind::InvalidData,
+                        format!("illegal section start: {:?}", line),
+                    )
+                })?;
 
-            let ty = &line[11..11+trailer];
+            let ty = &line[11..11 + trailer];
 
             section_type = Some(ty.to_string());
             end_marker = Some(format!("-----END {}-----", ty).to_string());
