@@ -20,12 +20,12 @@ pub enum Item {
 }
 
 impl Item {
-    fn from_start_line(start_line: &str, der: Vec<u8>) -> Option<Item> {
+    fn from_start_line(start_line: &[u8], der: Vec<u8>) -> Option<Item> {
         match start_line {
-            "CERTIFICATE" => Some(Item::X509Certificate(der)),
-            "RSA PRIVATE KEY" => Some(Item::RSAKey(der)),
-            "PRIVATE KEY" => Some(Item::PKCS8Key(der)),
-            "EC PRIVATE KEY" => Some(Item::ECKey(der)),
+            b"CERTIFICATE" => Some(Item::X509Certificate(der)),
+            b"RSA PRIVATE KEY" => Some(Item::RSAKey(der)),
+            b"PRIVATE KEY" => Some(Item::PKCS8Key(der)),
+            b"EC PRIVATE KEY" => Some(Item::ECKey(der)),
             _ => None,
         }
     }
@@ -40,35 +40,57 @@ impl Item {
 /// You can use this function to build an iterator, for example:
 /// `for item in iter::from_fn(|| read_one(rd).transpose()) { ... }`
 pub fn read_one(rd: &mut dyn io::BufRead) -> Result<Option<Item>, io::Error> {
-    let mut b64buf = String::with_capacity(1024);
-    let mut section = None;
-    let mut line = String::with_capacity(80);
+    let mut b64buf = Vec::with_capacity(1024);
+    let mut section = None::<(Vec<_>, Vec<_>)>;
+    let mut line = Vec::with_capacity(80);
 
     loop {
         line.clear();
-        let len = rd.read_line(&mut line)?;
+        let len = rd.read_until(b'\n', &mut line)?;
 
         if len == 0 {
             // EOF
             return match section {
                 Some((_, end_marker)) => Err(io::Error::new(
                     ErrorKind::InvalidData,
-                    format!("section end {:?} missing", end_marker),
+                    format!(
+                        "section end {:?} missing",
+                        String::from_utf8_lossy(&end_marker)
+                    ),
                 )),
                 None => Ok(None),
             };
         }
 
-        if line.starts_with("-----BEGIN ") {
-            let trailer = line[11..].find("-----").ok_or_else(|| {
-                io::Error::new(
-                    ErrorKind::InvalidData,
-                    format!("illegal section start: {:?}", line),
-                )
-            })?;
+        if line.starts_with(b"-----BEGIN ") {
+            let (mut trailer, mut pos) = (0, line.len());
+            for (i, &b) in line.iter().enumerate().rev() {
+                match b {
+                    b'-' => {
+                        trailer += 1;
+                        pos = i;
+                    }
+                    b'\n' | b'\r' | b' ' => continue,
+                    _ => break,
+                }
+            }
 
-            let ty = &line[11..11 + trailer];
-            section = Some((ty.to_string(), format!("-----END {}-----", ty).to_string()));
+            if trailer != 5 {
+                return Err(io::Error::new(
+                    ErrorKind::InvalidData,
+                    format!(
+                        "illegal section start: {:?}",
+                        String::from_utf8_lossy(&line)
+                    ),
+                ));
+            }
+
+            let ty = &line[11..pos];
+            let mut end = Vec::with_capacity(10 + 4 + ty.len());
+            end.extend_from_slice(b"-----END ");
+            end.extend_from_slice(ty);
+            end.extend_from_slice(b"-----");
+            section = Some((ty.to_owned(), end));
             continue;
         }
 
@@ -87,7 +109,14 @@ pub fn read_one(rd: &mut dyn io::BufRead) -> Result<Option<Item>, io::Error> {
         }
 
         if section.is_some() {
-            b64buf.push_str(line.trim());
+            let mut trim = 0;
+            for &b in line.iter().rev() {
+                match b {
+                    b'\n' | b'\r' | b' ' => trim += 1,
+                    _ => break,
+                }
+            }
+            b64buf.extend(&line[..line.len() - trim]);
         }
     }
 }
