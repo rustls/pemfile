@@ -2,7 +2,7 @@
 name = "rustls-pemfile"
 version = "1.0.1"
 edition = "2018"
-license = "Apache-2.0/ISC/MIT"
+license = "Apache-2.0 OR ISC OR MIT"
 readme = "README.md"
 description = "Basic .pem file parser for keys and certificates"
 homepage = "https://github.com/rustls/pemfile"
