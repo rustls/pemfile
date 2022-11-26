@@ -13,6 +13,19 @@ fn test_rsa_private_keys() {
 }
 
 #[test]
+fn test_opensslv3_rsa_private_keys() {
+    // Generated with:
+    // openssl genpkey -outform PEM -algorithm RSA -pkeyopt rsa_keygen_bits:1024 -out rsa1024.pkcsX.opensslv3.pem
+    let data = include_bytes!("data/rsa1024.pkcsX.opensslv3.pem");
+    let mut reader = BufReader::new(&data[..]);
+
+    assert_eq!(
+        rustls_pemfile::rsa_private_keys(&mut reader).unwrap().len(),
+        2
+    );
+}
+
+#[test]
 fn test_certs() {
     let data = include_bytes!("data/certificate.chain.pem");
     let mut reader = BufReader::new(&data[..]);
