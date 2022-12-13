@@ -1,6 +1,17 @@
 use std::io::{self, ErrorKind};
 
-use base64;
+use base64::{
+    alphabet,
+    engine::{
+        fast_portable::{FastPortable, FastPortableConfig},
+        DecodePaddingMode,
+    },
+};
+
+const DEFAULT_ENGINE_INDIFFERENT_PADDING: FastPortable = FastPortable::from(
+    &alphabet::STANDARD,
+    FastPortableConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent),
+);
 
 /// The contents of a single recognised block in a PEM file.
 #[non_exhaustive]
@@ -96,7 +107,7 @@ pub fn read_one(rd: &mut dyn io::BufRead) -> Result<Option<Item>, io::Error> {
 
         if let Some((section_type, end_marker)) = section.as_ref() {
             if line.starts_with(end_marker) {
-                let der = base64::decode(&b64buf)
+                let der = base64::decode_engine(&b64buf, &DEFAULT_ENGINE_INDIFFERENT_PADDING)
                     .map_err(|err| io::Error::new(ErrorKind::InvalidData, err))?;
 
                 if let Some(item) = Item::from_start_line(&section_type, der) {
