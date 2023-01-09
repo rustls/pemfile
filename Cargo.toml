@@ -10,7 +10,7 @@ repository = "https://github.com/rustls/pemfile"
 categories = ["network-programming", "cryptography"]
 
 [dependencies]
-base64 = "0.13.0"
+base64 = "0.21"
 
 [dev-dependencies]
 criterion = "0.3"
