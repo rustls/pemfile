@@ -13,7 +13,7 @@ categories = ["network-programming", "cryptography"]
 base64 = "0.21"
 
 [dev-dependencies]
-criterion = "0.3"
+bencher = "0.1.5"
 
 [[bench]]
 name = "benchmark"
