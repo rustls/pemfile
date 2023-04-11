@@ -86,6 +86,38 @@ fn test_sec1_vs_pkcs8() {
 }
 
 #[test]
+fn test_key_getter() {
+    {
+        let data = include_bytes!("data/nistp256key.pem");
+        let mut reader = BufReader::new(&data[..]);
+        let item = rustls_pemfile::read_one(&mut reader).unwrap();
+        let key = item.map(|x| x.key()).unwrap();
+        assert!(key.is_some());
+    }
+    {
+        let data = include_bytes!("data/rsa1024.pkcs1.pem");
+        let mut reader = BufReader::new(&data[..]);
+        let item = rustls_pemfile::read_one(&mut reader).unwrap();
+        let key = item.map(|x| x.key()).unwrap();
+        assert!(key.is_some());
+    }
+    {
+        let data = include_bytes!("data/rsa1024.pkcs8.pem");
+        let mut reader = BufReader::new(&data[..]);
+        let item = rustls_pemfile::read_one(&mut reader).unwrap();
+        let key = item.map(|x| x.key()).unwrap();
+        assert!(key.is_some());
+    }
+    {
+        let data = include_bytes!("data/certificate.pem");
+        let mut reader = BufReader::new(&data[..]);
+        let item = rustls_pemfile::read_one(&mut reader).unwrap();
+        let key = item.map(|x| x.key()).unwrap();
+        assert!(key.is_none());
+    }
+}
+
+#[test]
 fn parse_in_order() {
     let data = include_bytes!("data/zen.pem");
     let mut reader = BufReader::new(&data[..]);

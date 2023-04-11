@@ -2,7 +2,7 @@ use std::io::{self, ErrorKind};
 
 /// The contents of a single recognised block in a PEM file.
 #[non_exhaustive]
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Item {
     /// A DER-encoded x509 certificate.
     X509Certificate(Vec<u8>),
@@ -24,6 +24,17 @@ impl Item {
             b"RSA PRIVATE KEY" => Some(Item::RSAKey(der)),
             b"PRIVATE KEY" => Some(Item::PKCS8Key(der)),
             b"EC PRIVATE KEY" => Some(Item::ECKey(der)),
+            _ => None,
+        }
+    }
+
+    /// Get the bytes of a private key.
+    /// If the `Item` is not a private key, returns `None`.
+    pub fn key(self) -> Option<Vec<u8>> {
+        match self {
+            Item::ECKey(bytes) => Some(bytes),
+            Item::RSAKey(bytes) => Some(bytes),
+            Item::PKCS8Key(bytes) => Some(bytes),
             _ => None,
         }
     }
