@@ -87,34 +87,21 @@ fn test_sec1_vs_pkcs8() {
 
 #[test]
 fn test_key_getter() {
-    {
-        let data = include_bytes!("data/nistp256key.pem");
-        let mut reader = BufReader::new(&data[..]);
-        let item = rustls_pemfile::read_one(&mut reader).unwrap();
-        let key = item.map(|x| x.key()).unwrap();
-        assert!(key.is_some());
+    const P256: &[u8] = include_bytes!("data/nistp256key.pem");
+    const RSA1024: &[u8] = include_bytes!("data/rsa1024.pkcs1.pem");
+    const PKCS8: &[u8] = include_bytes!("data/rsa1024.pkcs8.pem");
+    const CERT: &[u8] = include_bytes!("data/certificate.pem");
+
+    fn key(bytes: &[u8]) -> Option<Vec<u8>> {
+        let mut reader = BufReader::new(&bytes[..]);
+        let item = rustls_pemfile::read_one(&mut reader).unwrap().unwrap();
+        item.key()
     }
-    {
-        let data = include_bytes!("data/rsa1024.pkcs1.pem");
-        let mut reader = BufReader::new(&data[..]);
-        let item = rustls_pemfile::read_one(&mut reader).unwrap();
-        let key = item.map(|x| x.key()).unwrap();
-        assert!(key.is_some());
-    }
-    {
-        let data = include_bytes!("data/rsa1024.pkcs8.pem");
-        let mut reader = BufReader::new(&data[..]);
-        let item = rustls_pemfile::read_one(&mut reader).unwrap();
-        let key = item.map(|x| x.key()).unwrap();
-        assert!(key.is_some());
-    }
-    {
-        let data = include_bytes!("data/certificate.pem");
-        let mut reader = BufReader::new(&data[..]);
-        let item = rustls_pemfile::read_one(&mut reader).unwrap();
-        let key = item.map(|x| x.key()).unwrap();
-        assert!(key.is_none());
-    }
+
+    assert!(key(P256).is_some());
+    assert!(key(RSA1024).is_some());
+    assert!(key(PKCS8).is_some());
+    assert!(key(CERT).is_none());
 }
 
 #[test]
