@@ -28,6 +28,13 @@ fn test_certs_with_binary() {
 }
 
 #[test]
+fn test_crls() {
+    let data = include_bytes!("data/crl.pem");
+    let mut reader = BufReader::new(&data[..]);
+    assert_eq!(rustls_pemfile::crls(&mut reader).unwrap().len(), 1);
+}
+
+#[test]
 fn test_pkcs8() {
     let data = include_bytes!("data/zen.pem");
     let mut reader = BufReader::new(&data[..]);
