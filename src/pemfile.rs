@@ -15,6 +15,9 @@ pub enum Item {
 
     /// A Sec1-encoded plaintext private key; as specified in RFC5915
     ECKey(Vec<u8>),
+
+    /// A Certificate Revocation List; as specified in RFC5280
+    Crl(Vec<u8>),
 }
 
 impl Item {
@@ -24,6 +27,7 @@ impl Item {
             b"RSA PRIVATE KEY" => Some(Item::RSAKey(der)),
             b"PRIVATE KEY" => Some(Item::PKCS8Key(der)),
             b"EC PRIVATE KEY" => Some(Item::ECKey(der)),
+            b"X509 CRL" => Some(Item::Crl(der)),
             _ => None,
         }
     }
