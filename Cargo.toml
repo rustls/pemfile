@@ -1,6 +1,6 @@
 [package]
 name = "rustls-pemfile"
-version = "1.0.2"
+version = "1.0.3"
 edition = "2018"
 license = "Apache-2.0 OR ISC OR MIT"
 readme = "README.md"
