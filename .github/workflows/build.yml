@@ -2,6 +2,28 @@ on: [push, pull_request]
 name: rustls-pemfile
 
 jobs:
+  rustfmt:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: actions/checkout@v3
+      - run: cargo fmt --all -- --check
+  clippy:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: actions/checkout@v3
+      - run: cargo clippy --all-features --all-targets
+  rustdoc:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v3
+      - run: cargo doc --all-features
   build:
     name: "Build and test"
     runs-on: ${{ matrix.os }}
@@ -32,7 +54,9 @@ jobs:
         run: cargo test
         env:
           RUST_BACKTRACE: 1
+          RUSTFLAGS: "-D warnings"
 
       - name: cargo test (release)
         run: cargo test --release
-
+        env:
+          RUSTFLAGS: "-D warnings"
