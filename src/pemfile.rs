@@ -102,7 +102,7 @@ pub fn read_one(rd: &mut dyn io::BufRead) -> Result<Option<Item>, io::Error> {
                     .decode(&b64buf)
                     .map_err(|err| io::Error::new(ErrorKind::InvalidData, err))?;
 
-                if let Some(item) = Item::from_start_line(&section_type, der) {
+                if let Some(item) = Item::from_start_line(section_type, der) {
                     return Ok(Some(item));
                 } else {
                     section = None;
