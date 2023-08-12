@@ -47,6 +47,10 @@ mod tests;
 /// --- Main crate APIs:
 mod pemfile;
 pub use pemfile::{read_all, read_one, Item};
+use pki_types::{
+    CertificateDer, CertificateRevocationListDer, PrivatePkcs1KeyDer, PrivatePkcs8KeyDer,
+    PrivateSec1KeyDer,
+};
 
 /// --- Legacy APIs:
 use std::io;
@@ -56,7 +60,7 @@ use std::io;
 ///
 /// This function does not fail if there are no certificates in the file --
 /// it returns an empty vector.
-pub fn certs(rd: &mut dyn io::BufRead) -> Result<Vec<Vec<u8>>, io::Error> {
+pub fn certs(rd: &mut dyn io::BufRead) -> Result<Vec<CertificateDer<'static>>, io::Error> {
     let mut certs = Vec::new();
 
     loop {
@@ -73,7 +77,9 @@ pub fn certs(rd: &mut dyn io::BufRead) -> Result<Vec<Vec<u8>>, io::Error> {
 ///
 /// This function does not fail if there are no CRLs in the file --
 /// it returns an empty vector.
-pub fn crls(rd: &mut dyn io::BufRead) -> Result<Vec<Vec<u8>>, io::Error> {
+pub fn crls(
+    rd: &mut dyn io::BufRead,
+) -> Result<Vec<CertificateRevocationListDer<'static>>, io::Error> {
     let mut crls = Vec::new();
 
     loop {
@@ -90,7 +96,9 @@ pub fn crls(rd: &mut dyn io::BufRead) -> Result<Vec<Vec<u8>>, io::Error> {
 ///
 /// This function does not fail if there are no keys in the file -- it returns an
 /// empty vector.
-pub fn rsa_private_keys(rd: &mut dyn io::BufRead) -> Result<Vec<Vec<u8>>, io::Error> {
+pub fn rsa_private_keys(
+    rd: &mut dyn io::BufRead,
+) -> Result<Vec<PrivatePkcs1KeyDer<'static>>, io::Error> {
     let mut keys = Vec::new();
 
     loop {
@@ -107,7 +115,9 @@ pub fn rsa_private_keys(rd: &mut dyn io::BufRead) -> Result<Vec<Vec<u8>>, io::Er
 ///
 /// This function does not fail if there are no keys in the file -- it returns an
 /// empty vector.
-pub fn pkcs8_private_keys(rd: &mut dyn io::BufRead) -> Result<Vec<Vec<u8>>, io::Error> {
+pub fn pkcs8_private_keys(
+    rd: &mut dyn io::BufRead,
+) -> Result<Vec<PrivatePkcs8KeyDer<'static>>, io::Error> {
     let mut keys = Vec::new();
 
     loop {
@@ -124,7 +134,9 @@ pub fn pkcs8_private_keys(rd: &mut dyn io::BufRead) -> Result<Vec<Vec<u8>>, io::
 ///
 /// This function does not fail if there are no keys in the file -- it returns an
 /// empty vector.
-pub fn ec_private_keys(rd: &mut dyn io::BufRead) -> Result<Vec<Vec<u8>>, io::Error> {
+pub fn ec_private_keys(
+    rd: &mut dyn io::BufRead,
+) -> Result<Vec<PrivateSec1KeyDer<'static>>, io::Error> {
     let mut keys = Vec::new();
 
     loop {

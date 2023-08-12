@@ -15,7 +15,7 @@ mod unit {
                     -----END RSA PRIVATE KEY-----\n"
             )
             .unwrap(),
-            vec![crate::Item::RSAKey(vec![0xab])]
+            vec![crate::Item::RSAKey(vec![0xab].into())]
         );
     }
 
@@ -29,7 +29,7 @@ mod unit {
                     junk"
             )
             .unwrap(),
-            vec![crate::Item::RSAKey(vec![0xab])]
+            vec![crate::Item::RSAKey(vec![0xab].into())]
         );
     }
 
@@ -44,7 +44,7 @@ mod unit {
                     \x00\x00"
             )
             .unwrap(),
-            vec![crate::Item::RSAKey(vec![0xab])]
+            vec![crate::Item::RSAKey(vec![0xab].into())]
         );
     }
 
