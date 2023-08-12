@@ -11,6 +11,7 @@ categories = ["network-programming", "cryptography"]
 
 [dependencies]
 base64 = "0.21"
+pki-types = { package = "rustls-pki-types", version = "0.1" }
 
 [dev-dependencies]
 bencher = "0.1.5"

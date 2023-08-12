@@ -1,36 +1,28 @@
 use std::io::{self, ErrorKind};
 
+use pki_types::{
+    CertificateDer, CertificateRevocationListDer, PrivatePkcs1KeyDer, PrivatePkcs8KeyDer,
+    PrivateSec1KeyDer,
+};
+
 /// The contents of a single recognised block in a PEM file.
 #[non_exhaustive]
 #[derive(Debug, PartialEq)]
 pub enum Item {
     /// A DER-encoded x509 certificate.
-    X509Certificate(Vec<u8>),
+    X509Certificate(CertificateDer<'static>),
 
     /// A DER-encoded plaintext RSA private key; as specified in PKCS#1/RFC3447
-    RSAKey(Vec<u8>),
+    RSAKey(PrivatePkcs1KeyDer<'static>),
 
     /// A DER-encoded plaintext private key; as specified in PKCS#8/RFC5958
-    PKCS8Key(Vec<u8>),
+    PKCS8Key(PrivatePkcs8KeyDer<'static>),
 
     /// A Sec1-encoded plaintext private key; as specified in RFC5915
-    ECKey(Vec<u8>),
+    ECKey(PrivateSec1KeyDer<'static>),
 
     /// A Certificate Revocation List; as specified in RFC5280
-    Crl(Vec<u8>),
-}
-
-impl Item {
-    fn from_start_line(start_line: &[u8], der: Vec<u8>) -> Option<Item> {
-        match start_line {
-            b"CERTIFICATE" => Some(Item::X509Certificate(der)),
-            b"RSA PRIVATE KEY" => Some(Item::RSAKey(der)),
-            b"PRIVATE KEY" => Some(Item::PKCS8Key(der)),
-            b"EC PRIVATE KEY" => Some(Item::ECKey(der)),
-            b"X509 CRL" => Some(Item::Crl(der)),
-            _ => None,
-        }
-    }
+    Crl(CertificateRevocationListDer<'static>),
 }
 
 /// Extract and decode the next PEM section from `rd`.
@@ -102,11 +94,16 @@ pub fn read_one(rd: &mut dyn io::BufRead) -> Result<Option<Item>, io::Error> {
                     .decode(&b64buf)
                     .map_err(|err| io::Error::new(ErrorKind::InvalidData, err))?;
 
-                if let Some(item) = Item::from_start_line(section_type, der) {
-                    return Ok(Some(item));
-                } else {
-                    section = None;
-                    b64buf.clear();
+                match section_type.as_slice() {
+                    b"CERTIFICATE" => return Ok(Some(Item::X509Certificate(der.into()))),
+                    b"RSA PRIVATE KEY" => return Ok(Some(Item::RSAKey(der.into()))),
+                    b"PRIVATE KEY" => return Ok(Some(Item::PKCS8Key(der.into()))),
+                    b"EC PRIVATE KEY" => return Ok(Some(Item::ECKey(der.into()))),
+                    b"X509 CRL" => return Ok(Some(Item::Crl(der.into()))),
+                    _ => {
+                        section = None;
+                        b64buf.clear();
+                    }
                 }
             }
         }
