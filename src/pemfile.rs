@@ -1,4 +1,5 @@
 use std::io::{self, ErrorKind};
+use std::iter;
 
 use pki_types::{
     CertificateDer, CertificateRevocationListDer, PrivatePkcs1KeyDer, PrivatePkcs8KeyDer,
@@ -122,15 +123,8 @@ pub fn read_one(rd: &mut dyn io::BufRead) -> Result<Option<Item>, io::Error> {
 }
 
 /// Extract and return all PEM sections by reading `rd`.
-pub fn read_all(rd: &mut dyn io::BufRead) -> Result<Vec<Item>, io::Error> {
-    let mut v = Vec::<Item>::new();
-
-    loop {
-        match read_one(rd)? {
-            None => return Ok(v),
-            Some(item) => v.push(item),
-        }
-    }
+pub fn read_all(rd: &mut dyn io::BufRead) -> impl Iterator<Item = Result<Item, io::Error>> + '_ {
+    iter::from_fn(move || read_one(rd).transpose())
 }
 
 mod base64 {

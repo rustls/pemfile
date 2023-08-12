@@ -54,22 +54,21 @@ use pki_types::{
 
 /// --- Legacy APIs:
 use std::io;
+use std::iter;
 
 /// Extract all the certificates from `rd`, and return a vec of byte vecs
 /// containing the der-format contents.
 ///
 /// This function does not fail if there are no certificates in the file --
 /// it returns an empty vector.
-pub fn certs(rd: &mut dyn io::BufRead) -> Result<Vec<CertificateDer<'static>>, io::Error> {
-    let mut certs = Vec::new();
-
-    loop {
-        match read_one(rd)? {
-            None => return Ok(certs),
-            Some(Item::X509Certificate(cert)) => certs.push(cert),
-            _ => {}
-        };
-    }
+pub fn certs(
+    rd: &mut dyn io::BufRead,
+) -> impl Iterator<Item = Result<CertificateDer<'static>, io::Error>> + '_ {
+    iter::from_fn(move || read_one(rd).transpose()).filter_map(|item| match item {
+        Ok(Item::X509Certificate(cert)) => Some(Ok(cert)),
+        Err(err) => Some(Err(err)),
+        _ => None,
+    })
 }
 
 /// Extract all the certificate revocation lists (CRLs) from `rd`, and return a vec of byte vecs
@@ -79,16 +78,12 @@ pub fn certs(rd: &mut dyn io::BufRead) -> Result<Vec<CertificateDer<'static>>, i
 /// it returns an empty vector.
 pub fn crls(
     rd: &mut dyn io::BufRead,
-) -> Result<Vec<CertificateRevocationListDer<'static>>, io::Error> {
-    let mut crls = Vec::new();
-
-    loop {
-        match read_one(rd)? {
-            None => return Ok(crls),
-            Some(Item::Crl(crl)) => crls.push(crl),
-            _ => {}
-        };
-    }
+) -> impl Iterator<Item = Result<CertificateRevocationListDer<'static>, io::Error>> + '_ {
+    iter::from_fn(move || read_one(rd).transpose()).filter_map(|item| match item {
+        Ok(Item::Crl(crl)) => Some(Ok(crl)),
+        Err(err) => Some(Err(err)),
+        _ => None,
+    })
 }
 
 /// Extract all RSA private keys from `rd`, and return a vec of byte vecs
@@ -98,16 +93,12 @@ pub fn crls(
 /// empty vector.
 pub fn rsa_private_keys(
     rd: &mut dyn io::BufRead,
-) -> Result<Vec<PrivatePkcs1KeyDer<'static>>, io::Error> {
-    let mut keys = Vec::new();
-
-    loop {
-        match read_one(rd)? {
-            None => return Ok(keys),
-            Some(Item::RSAKey(key)) => keys.push(key),
-            _ => {}
-        };
-    }
+) -> impl Iterator<Item = Result<PrivatePkcs1KeyDer<'static>, io::Error>> + '_ {
+    iter::from_fn(move || read_one(rd).transpose()).filter_map(|item| match item {
+        Ok(Item::RSAKey(key)) => Some(Ok(key)),
+        Err(err) => Some(Err(err)),
+        _ => None,
+    })
 }
 
 /// Extract all PKCS8-encoded private keys from `rd`, and return a vec of
@@ -117,16 +108,12 @@ pub fn rsa_private_keys(
 /// empty vector.
 pub fn pkcs8_private_keys(
     rd: &mut dyn io::BufRead,
-) -> Result<Vec<PrivatePkcs8KeyDer<'static>>, io::Error> {
-    let mut keys = Vec::new();
-
-    loop {
-        match read_one(rd)? {
-            None => return Ok(keys),
-            Some(Item::PKCS8Key(key)) => keys.push(key),
-            _ => {}
-        };
-    }
+) -> impl Iterator<Item = Result<PrivatePkcs8KeyDer<'static>, io::Error>> + '_ {
+    iter::from_fn(move || read_one(rd).transpose()).filter_map(|item| match item {
+        Ok(Item::PKCS8Key(key)) => Some(Ok(key)),
+        Err(err) => Some(Err(err)),
+        _ => None,
+    })
 }
 
 /// Extract all SEC1-encoded EC private keys from `rd`, and return a vec of
@@ -136,14 +123,10 @@ pub fn pkcs8_private_keys(
 /// empty vector.
 pub fn ec_private_keys(
     rd: &mut dyn io::BufRead,
-) -> Result<Vec<PrivateSec1KeyDer<'static>>, io::Error> {
-    let mut keys = Vec::new();
-
-    loop {
-        match read_one(rd)? {
-            None => return Ok(keys),
-            Some(Item::ECKey(key)) => keys.push(key),
-            _ => {}
-        };
-    }
+) -> impl Iterator<Item = Result<PrivateSec1KeyDer<'static>, io::Error>> + '_ {
+    iter::from_fn(move || read_one(rd).transpose()).filter_map(|item| match item {
+        Ok(Item::ECKey(key)) => Some(Ok(key)),
+        Err(err) => Some(Err(err)),
+        _ => None,
+    })
 }
