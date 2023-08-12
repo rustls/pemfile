@@ -11,18 +11,28 @@ use pki_types::{
 #[derive(Debug, PartialEq)]
 pub enum Item {
     /// A DER-encoded x509 certificate.
+    ///
+    /// Appears as "CERTIFICATE" in PEM files.
     X509Certificate(CertificateDer<'static>),
 
-    /// A DER-encoded plaintext RSA private key; as specified in PKCS#1/RFC3447
-    RSAKey(PrivatePkcs1KeyDer<'static>),
+    /// A DER-encoded plaintext RSA private key; as specified in PKCS #1/RFC 3447
+    ///
+    /// Appears as "RSA PRIVATE KEY" in PEM files.
+    Pkcs1Key(PrivatePkcs1KeyDer<'static>),
 
-    /// A DER-encoded plaintext private key; as specified in PKCS#8/RFC5958
-    PKCS8Key(PrivatePkcs8KeyDer<'static>),
+    /// A DER-encoded plaintext private key; as specified in PKCS #8/RFC 5958
+    ///
+    /// Appears as "PRIVATE KEY" in PEM files.
+    Pkcs8Key(PrivatePkcs8KeyDer<'static>),
 
-    /// A Sec1-encoded plaintext private key; as specified in RFC5915
-    ECKey(PrivateSec1KeyDer<'static>),
+    /// A Sec1-encoded plaintext private key; as specified in RFC 5915
+    ///
+    /// Appears as "EC PRIVATE KEY" in PEM files.
+    Sec1Key(PrivateSec1KeyDer<'static>),
 
-    /// A Certificate Revocation List; as specified in RFC5280
+    /// A Certificate Revocation List; as specified in RFC 5280
+    ///
+    /// Appears as "X509 CRL" in PEM files.
     Crl(CertificateRevocationListDer<'static>),
 }
 
@@ -97,9 +107,9 @@ pub fn read_one(rd: &mut dyn io::BufRead) -> Result<Option<Item>, io::Error> {
 
                 match section_type.as_slice() {
                     b"CERTIFICATE" => return Ok(Some(Item::X509Certificate(der.into()))),
-                    b"RSA PRIVATE KEY" => return Ok(Some(Item::RSAKey(der.into()))),
-                    b"PRIVATE KEY" => return Ok(Some(Item::PKCS8Key(der.into()))),
-                    b"EC PRIVATE KEY" => return Ok(Some(Item::ECKey(der.into()))),
+                    b"RSA PRIVATE KEY" => return Ok(Some(Item::Pkcs1Key(der.into()))),
+                    b"PRIVATE KEY" => return Ok(Some(Item::Pkcs8Key(der.into()))),
+                    b"EC PRIVATE KEY" => return Ok(Some(Item::Sec1Key(der.into()))),
                     b"X509 CRL" => return Ok(Some(Item::Crl(der.into()))),
                     _ => {
                         section = None;

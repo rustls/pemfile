@@ -22,9 +22,9 @@
 //!     match item.unwrap() {
 //!         Item::X509Certificate(cert) => println!("certificate {:?}", cert),
 //!         Item::Crl(crl) => println!("certificate revocation list: {:?}", crl),
-//!         Item::RSAKey(key) => println!("rsa pkcs1 key {:?}", key),
-//!         Item::PKCS8Key(key) => println!("pkcs8 key {:?}", key),
-//!         Item::ECKey(key) => println!("sec1 ec key {:?}", key),
+//!         Item::Pkcs1Key(key) => println!("rsa pkcs1 key {:?}", key),
+//!         Item::Pkcs8Key(key) => println!("pkcs8 key {:?}", key),
+//!         Item::Sec1Key(key) => println!("sec1 ec key {:?}", key),
 //!         _ => println!("unhandled item"),
 //!     }
 //! }
@@ -95,7 +95,7 @@ pub fn rsa_private_keys(
     rd: &mut dyn io::BufRead,
 ) -> impl Iterator<Item = Result<PrivatePkcs1KeyDer<'static>, io::Error>> + '_ {
     iter::from_fn(move || read_one(rd).transpose()).filter_map(|item| match item {
-        Ok(Item::RSAKey(key)) => Some(Ok(key)),
+        Ok(Item::Pkcs1Key(key)) => Some(Ok(key)),
         Err(err) => Some(Err(err)),
         _ => None,
     })
@@ -110,7 +110,7 @@ pub fn pkcs8_private_keys(
     rd: &mut dyn io::BufRead,
 ) -> impl Iterator<Item = Result<PrivatePkcs8KeyDer<'static>, io::Error>> + '_ {
     iter::from_fn(move || read_one(rd).transpose()).filter_map(|item| match item {
-        Ok(Item::PKCS8Key(key)) => Some(Ok(key)),
+        Ok(Item::Pkcs8Key(key)) => Some(Ok(key)),
         Err(err) => Some(Err(err)),
         _ => None,
     })
@@ -125,7 +125,7 @@ pub fn ec_private_keys(
     rd: &mut dyn io::BufRead,
 ) -> impl Iterator<Item = Result<PrivateSec1KeyDer<'static>, io::Error>> + '_ {
     iter::from_fn(move || read_one(rd).transpose()).filter_map(|item| match item {
-        Ok(Item::ECKey(key)) => Some(Ok(key)),
+        Ok(Item::Sec1Key(key)) => Some(Ok(key)),
         Err(err) => Some(Err(err)),
         _ => None,
     })
