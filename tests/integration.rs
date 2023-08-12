@@ -7,7 +7,10 @@ fn test_rsa_private_keys() {
     let mut reader = BufReader::new(&data[..]);
 
     assert_eq!(
-        rustls_pemfile::rsa_private_keys(&mut reader).unwrap().len(),
+        rustls_pemfile::rsa_private_keys(&mut reader)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+            .len(),
         2
     );
 }
@@ -17,21 +20,39 @@ fn test_certs() {
     let data = include_bytes!("data/certificate.chain.pem");
     let mut reader = BufReader::new(&data[..]);
 
-    assert_eq!(rustls_pemfile::certs(&mut reader).unwrap().len(), 3);
+    assert_eq!(
+        rustls_pemfile::certs(&mut reader)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+            .len(),
+        3
+    );
 }
 
 #[test]
 fn test_certs_with_binary() {
     let data = include_bytes!("data/gunk.pem");
     let mut reader = BufReader::new(&data[..]);
-    assert_eq!(rustls_pemfile::certs(&mut reader).unwrap().len(), 2);
+    assert_eq!(
+        rustls_pemfile::certs(&mut reader)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+            .len(),
+        2
+    );
 }
 
 #[test]
 fn test_crls() {
     let data = include_bytes!("data/crl.pem");
     let mut reader = BufReader::new(&data[..]);
-    assert_eq!(rustls_pemfile::crls(&mut reader).unwrap().len(), 1);
+    assert_eq!(
+        rustls_pemfile::crls(&mut reader)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+            .len(),
+        1
+    );
 }
 
 #[test]
@@ -41,6 +62,7 @@ fn test_pkcs8() {
 
     assert_eq!(
         rustls_pemfile::pkcs8_private_keys(&mut reader)
+            .collect::<Result<Vec<_>, _>>()
             .unwrap()
             .len(),
         2
@@ -52,7 +74,9 @@ fn test_sec1() {
     let data = include_bytes!("data/nistp256key.pem");
     let mut reader = BufReader::new(&data[..]);
 
-    let items = rustls_pemfile::read_all(&mut reader).unwrap();
+    let items = rustls_pemfile::read_all(&mut reader)
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
     assert_eq!(items.len(), 1);
     assert!(matches!(items[0], rustls_pemfile::Item::ECKey(_)));
 }
@@ -78,7 +102,9 @@ fn test_sec1_vs_pkcs8() {
         let data = include_bytes!("data/nistp256key.pem");
         let mut reader = BufReader::new(&data[..]);
 
-        let items = rustls_pemfile::read_all(&mut reader).unwrap();
+        let items = rustls_pemfile::read_all(&mut reader)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
         assert!(matches!(items[0], rustls_pemfile::Item::ECKey(_)));
         println!("sec1 {:?}", items);
     }
@@ -86,7 +112,9 @@ fn test_sec1_vs_pkcs8() {
         let data = include_bytes!("data/nistp256key.pkcs8.pem");
         let mut reader = BufReader::new(&data[..]);
 
-        let items = rustls_pemfile::read_all(&mut reader).unwrap();
+        let items = rustls_pemfile::read_all(&mut reader)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
         assert!(matches!(items[0], rustls_pemfile::Item::PKCS8Key(_)));
         println!("p8 {:?}", items);
     }
@@ -97,7 +125,9 @@ fn parse_in_order() {
     let data = include_bytes!("data/zen.pem");
     let mut reader = BufReader::new(&data[..]);
 
-    let items = rustls_pemfile::read_all(&mut reader).unwrap();
+    let items = rustls_pemfile::read_all(&mut reader)
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
     assert_eq!(items.len(), 9);
     assert!(matches!(items[0], rustls_pemfile::Item::X509Certificate(_)));
     assert!(matches!(items[1], rustls_pemfile::Item::X509Certificate(_)));

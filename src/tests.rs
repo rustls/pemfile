@@ -2,7 +2,7 @@
 mod unit {
     fn check(data: &[u8]) -> Result<Vec<crate::Item>, std::io::Error> {
         let mut reader = std::io::BufReader::new(data);
-        crate::read_all(&mut reader)
+        crate::read_all(&mut reader).collect()
     }
 
     #[test]
