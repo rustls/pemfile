@@ -78,7 +78,7 @@ fn test_sec1() {
         .collect::<Result<Vec<_>, _>>()
         .unwrap();
     assert_eq!(items.len(), 1);
-    assert!(matches!(items[0], rustls_pemfile::Item::ECKey(_)));
+    assert!(matches!(items[0], rustls_pemfile::Item::Sec1Key(_)));
 }
 
 #[test]
@@ -105,7 +105,7 @@ fn test_sec1_vs_pkcs8() {
         let items = rustls_pemfile::read_all(&mut reader)
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
-        assert!(matches!(items[0], rustls_pemfile::Item::ECKey(_)));
+        assert!(matches!(items[0], rustls_pemfile::Item::Sec1Key(_)));
         println!("sec1 {:?}", items);
     }
     {
@@ -115,7 +115,7 @@ fn test_sec1_vs_pkcs8() {
         let items = rustls_pemfile::read_all(&mut reader)
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
-        assert!(matches!(items[0], rustls_pemfile::Item::PKCS8Key(_)));
+        assert!(matches!(items[0], rustls_pemfile::Item::Pkcs8Key(_)));
         println!("p8 {:?}", items);
     }
 }
@@ -133,9 +133,9 @@ fn parse_in_order() {
     assert!(matches!(items[1], rustls_pemfile::Item::X509Certificate(_)));
     assert!(matches!(items[2], rustls_pemfile::Item::X509Certificate(_)));
     assert!(matches!(items[3], rustls_pemfile::Item::X509Certificate(_)));
-    assert!(matches!(items[4], rustls_pemfile::Item::ECKey(_)));
-    assert!(matches!(items[5], rustls_pemfile::Item::PKCS8Key(_)));
-    assert!(matches!(items[6], rustls_pemfile::Item::RSAKey(_)));
-    assert!(matches!(items[7], rustls_pemfile::Item::PKCS8Key(_)));
+    assert!(matches!(items[4], rustls_pemfile::Item::Sec1Key(_)));
+    assert!(matches!(items[5], rustls_pemfile::Item::Pkcs8Key(_)));
+    assert!(matches!(items[6], rustls_pemfile::Item::Pkcs1Key(_)));
+    assert!(matches!(items[7], rustls_pemfile::Item::Pkcs8Key(_)));
     assert!(matches!(items[8], rustls_pemfile::Item::Crl(_)));
 }
