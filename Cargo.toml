@@ -1,6 +1,6 @@
 [package]
 name = "rustls-pemfile"
-version = "2.0.0-alpha.0"
+version = "2.0.0-alpha.1"
 edition = "2018"
 license = "Apache-2.0 OR ISC OR MIT"
 readme = "README.md"
@@ -11,7 +11,7 @@ categories = ["network-programming", "cryptography"]
 
 [dependencies]
 base64 = "0.21"
-pki-types = { package = "rustls-pki-types", version = "0.1" }
+pki-types = { package = "rustls-pki-types", version = "0.2" }
 
 [dev-dependencies]
 bencher = "0.1.5"
