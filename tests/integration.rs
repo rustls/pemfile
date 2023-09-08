@@ -16,6 +16,17 @@ fn test_rsa_private_keys() {
 }
 
 #[test]
+fn private_key() {
+    let data = include_bytes!("data/zen2.pem");
+    let mut reader = BufReader::new(&data[..]);
+    rustls_pemfile::private_key(&mut reader).unwrap().unwrap();
+
+    let data = include_bytes!("data/certificate.chain.pem");
+    let mut reader = BufReader::new(&data[..]);
+    assert!(rustls_pemfile::private_key(&mut reader).unwrap().is_none());
+}
+
+#[test]
 fn test_certs() {
     let data = include_bytes!("data/certificate.chain.pem");
     let mut reader = BufReader::new(&data[..]);

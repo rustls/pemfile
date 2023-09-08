@@ -47,6 +47,7 @@ mod tests;
 /// --- Main crate APIs:
 mod pemfile;
 pub use pemfile::{read_all, read_one, Item};
+use pki_types::PrivateKeyDer;
 use pki_types::{
     CertificateDer, CertificateRevocationListDer, PrivatePkcs1KeyDer, PrivatePkcs8KeyDer,
     PrivateSec1KeyDer,
@@ -68,6 +69,23 @@ pub fn certs(
         Err(err) => Some(Err(err)),
         _ => None,
     })
+}
+
+/// Return the first private key found in `rd`.
+///
+/// Yields the first PEM section describing a private key (of any type), or an error if a
+/// problem occurs while trying to read PEM sections.
+pub fn private_key(rd: &mut dyn io::BufRead) -> Result<Option<PrivateKeyDer<'static>>, io::Error> {
+    for result in iter::from_fn(move || read_one(rd).transpose()) {
+        match result? {
+            Item::Pkcs1Key(key) => return Ok(Some(key.into())),
+            Item::Pkcs8Key(key) => return Ok(Some(key.into())),
+            Item::Sec1Key(key) => return Ok(Some(key.into())),
+            Item::X509Certificate(_) | Item::Crl(_) => continue,
+        }
+    }
+
+    Ok(None)
 }
 
 /// Return an iterator certificate revocation lists (CRLs) from `rd`.
