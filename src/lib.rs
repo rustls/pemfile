@@ -40,6 +40,11 @@
     unused_extern_crates,
     unused_qualifications
 )]
+#![cfg_attr(not(test), no_std)]
+
+extern crate alloc;
+#[cfg(not(test))]
+extern crate std;
 
 #[cfg(test)]
 mod tests;
@@ -53,9 +58,9 @@ use pki_types::{
     PrivateSec1KeyDer,
 };
 
+use core::iter;
 /// --- Legacy APIs:
 use std::io;
-use std::iter;
 
 /// Return an iterator over certificates from `rd`.
 ///
