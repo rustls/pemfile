@@ -2,8 +2,10 @@ use alloc::borrow::ToOwned;
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
+#[cfg(feature = "std")]
 use core::iter;
 use core::ops::ControlFlow;
+#[cfg(feature = "std")]
 use std::io::{self, ErrorKind};
 
 use pki_types::{
@@ -94,6 +96,7 @@ pub fn read_one_from_slice(mut input: &[u8]) -> Result<Option<(Item, &[u8])>, Er
 ///
 /// You can use this function to build an iterator, for example:
 /// `for item in iter::from_fn(|| read_one(rd).transpose()) { ... }`
+#[cfg(feature = "std")]
 pub fn read_one(rd: &mut dyn io::BufRead) -> Result<Option<Item>, io::Error> {
     let mut b64buf = Vec::with_capacity(1024);
     let mut section = None::<(Vec<_>, Vec<_>)>;
@@ -221,6 +224,7 @@ fn read_one_impl(
 
 // Ported from https://github.com/rust-lang/rust/blob/91cfcb021935853caa06698b759c293c09d1e96a/library/std/src/io/mod.rs#L1990 and
 // modified to look for our accepted newlines.
+#[cfg(feature = "std")]
 fn read_until_newline<R: io::BufRead + ?Sized>(
     r: &mut R,
     buf: &mut Vec<u8>,
@@ -257,6 +261,7 @@ fn read_until_newline<R: io::BufRead + ?Sized>(
 }
 
 /// Extract and return all PEM sections by reading `rd`.
+#[cfg(feature = "std")]
 pub fn read_all(rd: &mut dyn io::BufRead) -> impl Iterator<Item = Result<Item, io::Error>> + '_ {
     iter::from_fn(move || read_one(rd).transpose())
 }
