@@ -49,6 +49,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
+          targets: x86_64-unknown-none
 
       - name: cargo test (debug)
         run: cargo test
@@ -58,5 +59,12 @@ jobs:
 
       - name: cargo test (release)
         run: cargo test --release
+        env:
+          RUSTFLAGS: "-D warnings"
+
+        # this target does _not_ include the libstd crate in its sysroot
+        # it will catch unwanted usage of libstd in _dependencies_
+      - name: cargo build no-std mode
+        run: cargo build --no-default-features --target x86_64-unknown-none
         env:
           RUSTFLAGS: "-D warnings"

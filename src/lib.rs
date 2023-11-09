@@ -12,8 +12,16 @@
 //! - Use `certs()` to extract just the certificates (silently discarding other sections), and
 //!   similarly for `rsa_private_keys()` and `pkcs8_private_keys()`.
 //!
+//! # no-std support
+//!
+//! The opt-out "std" Cargo feature can be disabled to put this crate in no-std mode.
+//!
+//! In no-std mode, the `read_one_from_slice` API can be used to parse a .pem file that has already
+//! been loaded into memory.
+//!
 //! ## Example code
-//! ```
+#![cfg_attr(feature = "std", doc = "```")]
+#![cfg_attr(not(feature = "std"), doc = "```ignore")]
 //! use std::iter;
 //! use rustls_pemfile::{Item, read_one};
 //! # let mut reader = std::io::BufReader::new(&b"junk\n-----BEGIN RSA PRIVATE KEY-----\nqw\n-----END RSA PRIVATE KEY-----\n"[..]);
@@ -43,29 +51,37 @@
 #![cfg_attr(not(test), no_std)]
 
 extern crate alloc;
-#[cfg(not(test))]
+#[cfg(all(feature = "std", not(test)))]
 extern crate std;
 
 #[cfg(test)]
+#[cfg(feature = "std")]
 mod tests;
 
 /// --- Main crate APIs:
 mod pemfile;
-pub use pemfile::{read_all, read_one, read_one_from_slice, Error, Item};
+#[cfg(feature = "std")]
+pub use pemfile::{read_all, read_one};
+pub use pemfile::{read_one_from_slice, Error, Item};
+#[cfg(feature = "std")]
 use pki_types::PrivateKeyDer;
+#[cfg(feature = "std")]
 use pki_types::{
     CertificateDer, CertificateRevocationListDer, PrivatePkcs1KeyDer, PrivatePkcs8KeyDer,
     PrivateSec1KeyDer,
 };
 
+#[cfg(feature = "std")]
 use core::iter;
 /// --- Legacy APIs:
+#[cfg(feature = "std")]
 use std::io;
 
 /// Return an iterator over certificates from `rd`.
 ///
 /// Filters out any PEM sections that are not certificates and yields errors if a problem
 /// occurs while trying to extract a certificate.
+#[cfg(feature = "std")]
 pub fn certs(
     rd: &mut dyn io::BufRead,
 ) -> impl Iterator<Item = Result<CertificateDer<'static>, io::Error>> + '_ {
@@ -80,6 +96,7 @@ pub fn certs(
 ///
 /// Yields the first PEM section describing a private key (of any type), or an error if a
 /// problem occurs while trying to read PEM sections.
+#[cfg(feature = "std")]
 pub fn private_key(rd: &mut dyn io::BufRead) -> Result<Option<PrivateKeyDer<'static>>, io::Error> {
     for result in iter::from_fn(move || read_one(rd).transpose()) {
         match result? {
@@ -97,6 +114,7 @@ pub fn private_key(rd: &mut dyn io::BufRead) -> Result<Option<PrivateKeyDer<'sta
 ///
 /// Filters out any PEM sections that are not CRLs and yields errors if a problem occurs
 /// while trying to extract a CRL.
+#[cfg(feature = "std")]
 pub fn crls(
     rd: &mut dyn io::BufRead,
 ) -> impl Iterator<Item = Result<CertificateRevocationListDer<'static>, io::Error>> + '_ {
@@ -111,6 +129,7 @@ pub fn crls(
 ///
 /// Filters out any PEM sections that are not RSA private keys and yields errors if a problem
 /// occurs while trying to extract an RSA private key.
+#[cfg(feature = "std")]
 pub fn rsa_private_keys(
     rd: &mut dyn io::BufRead,
 ) -> impl Iterator<Item = Result<PrivatePkcs1KeyDer<'static>, io::Error>> + '_ {
@@ -125,6 +144,7 @@ pub fn rsa_private_keys(
 ///
 /// Filters out any PEM sections that are not PKCS8-encoded private keys and yields errors if a
 /// problem occurs while trying to extract an RSA private key.
+#[cfg(feature = "std")]
 pub fn pkcs8_private_keys(
     rd: &mut dyn io::BufRead,
 ) -> impl Iterator<Item = Result<PrivatePkcs8KeyDer<'static>, io::Error>> + '_ {
@@ -139,6 +159,7 @@ pub fn pkcs8_private_keys(
 ///
 /// Filters out any PEM sections that are not SEC1-encoded EC private keys and yields errors if a
 /// problem occurs while trying to extract a SEC1-encoded EC private key.
+#[cfg(feature = "std")]
 pub fn ec_private_keys(
     rd: &mut dyn io::BufRead,
 ) -> impl Iterator<Item = Result<PrivateSec1KeyDer<'static>, io::Error>> + '_ {
