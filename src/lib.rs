@@ -51,7 +51,7 @@ mod tests;
 
 /// --- Main crate APIs:
 mod pemfile;
-pub use pemfile::{read_all, read_one, Error, Item};
+pub use pemfile::{read_all, read_one, read_one_from_slice, Error, Item};
 use pki_types::PrivateKeyDer;
 use pki_types::{
     CertificateDer, CertificateRevocationListDer, PrivatePkcs1KeyDer, PrivatePkcs8KeyDer,

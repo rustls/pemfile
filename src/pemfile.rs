@@ -60,6 +60,32 @@ pub enum Error {
     Base64Decode(String),
 }
 
+/// Extract and decode the next PEM section from `input`
+///
+/// - `Ok(None)` is returned if there is no PEM section to read from `input`
+/// - Syntax errors and decoding errors produce a `Err(...)`
+/// - Otherwise each decoded section is returned with a `Ok(Some((Item::..., remainder)))` where
+///   `remainder` is the part of the `input` that follows the returned section
+pub fn read_one_from_slice(mut input: &[u8]) -> Result<Option<(Item, &[u8])>, Error> {
+    let mut b64buf = Vec::with_capacity(1024);
+    let mut section = None::<(Vec<_>, Vec<_>)>;
+
+    loop {
+        let next_line = if let Some(index) = input.iter().position(|byte| *byte == b'\n') {
+            let (line, newline_plus_remainder) = input.split_at(index);
+            input = &newline_plus_remainder[1..];
+            Some(line)
+        } else {
+            None
+        };
+
+        match read_one_impl(next_line, &mut section, &mut b64buf)? {
+            ControlFlow::Continue(()) => continue,
+            ControlFlow::Break(item) => return Ok(item.map(|item| (item, input))),
+        }
+    }
+}
+
 /// Extract and decode the next PEM section from `rd`.
 ///
 /// - Ok(None) is returned if there is no PEM section read from `rd`.
