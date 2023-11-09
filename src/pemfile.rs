@@ -3,6 +3,7 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::iter;
+use core::ops::ControlFlow;
 use std::io::{self, ErrorKind};
 
 use pki_types::{
@@ -57,83 +58,106 @@ pub fn read_one(rd: &mut dyn io::BufRead) -> Result<Option<Item>, io::Error> {
         line.clear();
         let len = read_until_newline(rd, &mut line)?;
 
-        if len == 0 {
-            // EOF
-            return match section {
-                Some((_, end_marker)) => Err(io::Error::new(
-                    ErrorKind::InvalidData,
-                    format!(
-                        "section end {:?} missing",
-                        String::from_utf8_lossy(&end_marker)
-                    ),
-                )),
-                None => Ok(None),
-            };
-        }
+        let next_line = if len == 0 {
+            None
+        } else {
+            Some(line.as_slice())
+        };
 
-        if line.starts_with(b"-----BEGIN ") {
-            let (mut trailer, mut pos) = (0, line.len());
-            for (i, &b) in line.iter().enumerate().rev() {
-                match b {
-                    b'-' => {
-                        trailer += 1;
-                        pos = i;
-                    }
-                    b'\n' | b'\r' | b' ' => continue,
-                    _ => break,
-                }
-            }
-
-            if trailer != 5 {
-                return Err(io::Error::new(
-                    ErrorKind::InvalidData,
-                    format!(
-                        "illegal section start: {:?}",
-                        String::from_utf8_lossy(&line)
-                    ),
-                ));
-            }
-
-            let ty = &line[11..pos];
-            let mut end = Vec::with_capacity(10 + 4 + ty.len());
-            end.extend_from_slice(b"-----END ");
-            end.extend_from_slice(ty);
-            end.extend_from_slice(b"-----");
-            section = Some((ty.to_owned(), end));
-            continue;
-        }
-
-        if let Some((section_type, end_marker)) = section.as_ref() {
-            if line.starts_with(end_marker) {
-                let der = base64::ENGINE
-                    .decode(&b64buf)
-                    .map_err(|err| io::Error::new(ErrorKind::InvalidData, err))?;
-
-                match section_type.as_slice() {
-                    b"CERTIFICATE" => return Ok(Some(Item::X509Certificate(der.into()))),
-                    b"RSA PRIVATE KEY" => return Ok(Some(Item::Pkcs1Key(der.into()))),
-                    b"PRIVATE KEY" => return Ok(Some(Item::Pkcs8Key(der.into()))),
-                    b"EC PRIVATE KEY" => return Ok(Some(Item::Sec1Key(der.into()))),
-                    b"X509 CRL" => return Ok(Some(Item::Crl(der.into()))),
-                    _ => {
-                        section = None;
-                        b64buf.clear();
-                    }
-                }
-            }
-        }
-
-        if section.is_some() {
-            let mut trim = 0;
-            for &b in line.iter().rev() {
-                match b {
-                    b'\n' | b'\r' | b' ' => trim += 1,
-                    _ => break,
-                }
-            }
-            b64buf.extend(&line[..line.len() - trim]);
+        match read_one_impl(next_line, &mut section, &mut b64buf)? {
+            ControlFlow::Break(opt) => return Ok(opt),
+            ControlFlow::Continue(()) => continue,
         }
     }
+}
+
+fn read_one_impl(
+    next_line: Option<&[u8]>,
+    section: &mut Option<(Vec<u8>, Vec<u8>)>,
+    b64buf: &mut Vec<u8>,
+) -> Result<ControlFlow<Option<Item>, ()>, io::Error> {
+    let line = if let Some(line) = next_line {
+        line
+    } else {
+        // EOF
+        return match section.take() {
+            Some((_, end_marker)) => Err(io::Error::new(
+                ErrorKind::InvalidData,
+                format!(
+                    "section end {:?} missing",
+                    String::from_utf8_lossy(&end_marker)
+                ),
+            )),
+            None => Ok(ControlFlow::Break(None)),
+        };
+    };
+
+    if line.starts_with(b"-----BEGIN ") {
+        let (mut trailer, mut pos) = (0, line.len());
+        for (i, &b) in line.iter().enumerate().rev() {
+            match b {
+                b'-' => {
+                    trailer += 1;
+                    pos = i;
+                }
+                b'\n' | b'\r' | b' ' => continue,
+                _ => break,
+            }
+        }
+
+        if trailer != 5 {
+            return Err(io::Error::new(
+                ErrorKind::InvalidData,
+                format!("illegal section start: {:?}", String::from_utf8_lossy(line)),
+            ));
+        }
+
+        let ty = &line[11..pos];
+        let mut end = Vec::with_capacity(10 + 4 + ty.len());
+        end.extend_from_slice(b"-----END ");
+        end.extend_from_slice(ty);
+        end.extend_from_slice(b"-----");
+        *section = Some((ty.to_owned(), end));
+        return Ok(ControlFlow::Continue(()));
+    }
+
+    if let Some((section_type, end_marker)) = section.as_ref() {
+        if line.starts_with(end_marker) {
+            let der = base64::ENGINE
+                .decode(&b64buf)
+                .map_err(|err| io::Error::new(ErrorKind::InvalidData, err))?;
+
+            let item = match section_type.as_slice() {
+                b"CERTIFICATE" => Some(Item::X509Certificate(der.into())),
+                b"RSA PRIVATE KEY" => Some(Item::Pkcs1Key(der.into())),
+                b"PRIVATE KEY" => Some(Item::Pkcs8Key(der.into())),
+                b"EC PRIVATE KEY" => Some(Item::Sec1Key(der.into())),
+                b"X509 CRL" => Some(Item::Crl(der.into())),
+                _ => {
+                    *section = None;
+                    b64buf.clear();
+                    None
+                }
+            };
+
+            if item.is_some() {
+                return Ok(ControlFlow::Break(item));
+            }
+        }
+    }
+
+    if section.is_some() {
+        let mut trim = 0;
+        for &b in line.iter().rev() {
+            match b {
+                b'\n' | b'\r' | b' ' => trim += 1,
+                _ => break,
+            }
+        }
+        b64buf.extend(&line[..line.len() - trim]);
+    }
+
+    Ok(ControlFlow::Continue(()))
 }
 
 // Ported from https://github.com/rust-lang/rust/blob/91cfcb021935853caa06698b759c293c09d1e96a/library/std/src/io/mod.rs#L1990 and
