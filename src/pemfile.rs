@@ -41,6 +41,25 @@ pub enum Item {
     Crl(CertificateRevocationListDer<'static>),
 }
 
+/// Errors that may arise when parsing the contents of a PEM file
+#[derive(Debug, PartialEq)]
+pub enum Error {
+    /// a section is missing its "END marker" line
+    MissingSectionEnd {
+        /// the expected "END marker" line that was not found
+        end_marker: Vec<u8>,
+    },
+
+    /// syntax error found in the line that starts a new section
+    IllegalSectionStart {
+        /// line that contains the syntax error
+        line: Vec<u8>,
+    },
+
+    /// base64 decode error
+    Base64Decode(String),
+}
+
 /// Extract and decode the next PEM section from `rd`.
 ///
 /// - Ok(None) is returned if there is no PEM section read from `rd`.
@@ -64,9 +83,30 @@ pub fn read_one(rd: &mut dyn io::BufRead) -> Result<Option<Item>, io::Error> {
             Some(line.as_slice())
         };
 
-        match read_one_impl(next_line, &mut section, &mut b64buf)? {
-            ControlFlow::Break(opt) => return Ok(opt),
-            ControlFlow::Continue(()) => continue,
+        match read_one_impl(next_line, &mut section, &mut b64buf) {
+            Ok(ControlFlow::Break(opt)) => return Ok(opt),
+            Ok(ControlFlow::Continue(())) => continue,
+            Err(e) => {
+                return Err(match e {
+                    Error::MissingSectionEnd { end_marker } => io::Error::new(
+                        ErrorKind::InvalidData,
+                        format!(
+                            "section end {:?} missing",
+                            String::from_utf8_lossy(&end_marker)
+                        ),
+                    ),
+
+                    Error::IllegalSectionStart { line } => io::Error::new(
+                        ErrorKind::InvalidData,
+                        format!(
+                            "illegal section start: {:?}",
+                            String::from_utf8_lossy(&line)
+                        ),
+                    ),
+
+                    Error::Base64Decode(err) => io::Error::new(ErrorKind::InvalidData, err),
+                });
+            }
         }
     }
 }
@@ -75,19 +115,13 @@ fn read_one_impl(
     next_line: Option<&[u8]>,
     section: &mut Option<(Vec<u8>, Vec<u8>)>,
     b64buf: &mut Vec<u8>,
-) -> Result<ControlFlow<Option<Item>, ()>, io::Error> {
+) -> Result<ControlFlow<Option<Item>, ()>, Error> {
     let line = if let Some(line) = next_line {
         line
     } else {
         // EOF
         return match section.take() {
-            Some((_, end_marker)) => Err(io::Error::new(
-                ErrorKind::InvalidData,
-                format!(
-                    "section end {:?} missing",
-                    String::from_utf8_lossy(&end_marker)
-                ),
-            )),
+            Some((_, end_marker)) => Err(Error::MissingSectionEnd { end_marker }),
             None => Ok(ControlFlow::Break(None)),
         };
     };
@@ -106,10 +140,9 @@ fn read_one_impl(
         }
 
         if trailer != 5 {
-            return Err(io::Error::new(
-                ErrorKind::InvalidData,
-                format!("illegal section start: {:?}", String::from_utf8_lossy(line)),
-            ));
+            return Err(Error::IllegalSectionStart {
+                line: line.to_vec(),
+            });
         }
 
         let ty = &line[11..pos];
@@ -125,7 +158,7 @@ fn read_one_impl(
         if line.starts_with(end_marker) {
             let der = base64::ENGINE
                 .decode(&b64buf)
-                .map_err(|err| io::Error::new(ErrorKind::InvalidData, err))?;
+                .map_err(|err| Error::Base64Decode(format!("{err:?}")))?;
 
             let item = match section_type.as_slice() {
                 b"CERTIFICATE" => Some(Item::X509Certificate(der.into())),

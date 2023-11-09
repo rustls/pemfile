@@ -59,7 +59,7 @@ mod unit {
                             -----END RSA PRIVATE KEY-----\n"
                 )
             ),
-            "Err(Custom { kind: InvalidData, error: InvalidByte(1, 61) })"
+            "Err(Custom { kind: InvalidData, error: \"InvalidByte(1, 61)\" })"
         );
     }
 
