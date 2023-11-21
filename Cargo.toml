@@ -11,7 +11,7 @@ categories = ["network-programming", "cryptography"]
 
 [dependencies]
 base64 = { version = "0.21", default-features = false, features = ["alloc"] }
-pki-types = { package = "rustls-pki-types", version = "0.2" }
+pki-types = { package = "rustls-pki-types", version = "0.2.2", git = "https://github.com/rustls/pki-types", rev = "f5691e203714613cf0ff3316bad17523cd41b105" }
 
 [dev-dependencies]
 bencher = "0.1.5"
