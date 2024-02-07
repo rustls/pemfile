@@ -15,7 +15,7 @@ use pki_types::{
 
 /// The contents of a single recognised block in a PEM file.
 #[non_exhaustive]
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Item {
     /// A DER-encoded x509 certificate.
     ///
