@@ -9,8 +9,8 @@ use core::ops::ControlFlow;
 use std::io::{self, ErrorKind};
 
 use pki_types::{
-    CertificateDer, CertificateRevocationListDer, PrivatePkcs1KeyDer, PrivatePkcs8KeyDer,
-    PrivateSec1KeyDer,
+    CertificateDer, CertificateRevocationListDer, CertificateSigningRequestDer, PrivatePkcs1KeyDer,
+    PrivatePkcs8KeyDer, PrivateSec1KeyDer,
 };
 
 /// The contents of a single recognised block in a PEM file.
@@ -41,6 +41,11 @@ pub enum Item {
     ///
     /// Appears as "X509 CRL" in PEM files.
     Crl(CertificateRevocationListDer<'static>),
+
+    /// A Certificate Signing Request; as specified in RFC 2986
+    ///
+    /// Appears as "CERTIFICATE REQUEST" in PEM files.
+    Csr(CertificateSigningRequestDer<'static>),
 }
 
 /// Errors that may arise when parsing the contents of a PEM file
@@ -195,6 +200,7 @@ fn read_one_impl(
                 b"PRIVATE KEY" => Some(Item::Pkcs8Key(der.into())),
                 b"EC PRIVATE KEY" => Some(Item::Sec1Key(der.into())),
                 b"X509 CRL" => Some(Item::Crl(der.into())),
+                b"CERTIFICATE REQUEST" => Some(Item::Csr(der.into())),
                 _ => {
                     *section = None;
                     b64buf.clear();

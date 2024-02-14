@@ -27,6 +27,17 @@ fn private_key() {
 }
 
 #[test]
+fn test_csr() {
+    let data = include_bytes!("data/csr.pem");
+    let mut reader = BufReader::new(&data[..]);
+    rustls_pemfile::csr(&mut reader).unwrap().unwrap();
+
+    let data = include_bytes!("data/certificate.chain.pem");
+    let mut reader = BufReader::new(&data[..]);
+    assert!(rustls_pemfile::private_key(&mut reader).unwrap().is_none());
+}
+
+#[test]
 fn test_certs() {
     let data = include_bytes!("data/certificate.chain.pem");
     let mut reader = BufReader::new(&data[..]);
@@ -139,7 +150,7 @@ fn parse_in_order() {
     let items = rustls_pemfile::read_all(&mut reader)
         .collect::<Result<Vec<_>, _>>()
         .unwrap();
-    assert_eq!(items.len(), 9);
+    assert_eq!(items.len(), 10);
     assert!(matches!(items[0], rustls_pemfile::Item::X509Certificate(_)));
     assert!(matches!(items[1], rustls_pemfile::Item::X509Certificate(_)));
     assert!(matches!(items[2], rustls_pemfile::Item::X509Certificate(_)));
@@ -149,6 +160,7 @@ fn parse_in_order() {
     assert!(matches!(items[6], rustls_pemfile::Item::Pkcs1Key(_)));
     assert!(matches!(items[7], rustls_pemfile::Item::Pkcs8Key(_)));
     assert!(matches!(items[8], rustls_pemfile::Item::Crl(_)));
+    assert!(matches!(items[9], rustls_pemfile::Item::Csr(_)));
 }
 
 #[test]
