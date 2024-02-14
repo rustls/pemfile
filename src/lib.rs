@@ -30,6 +30,7 @@
 //!     match item.unwrap() {
 //!         Item::X509Certificate(cert) => println!("certificate {:?}", cert),
 //!         Item::Crl(crl) => println!("certificate revocation list: {:?}", crl),
+//!         Item::Csr(csr) => println!("certificate signing request: {:?}", csr),
 //!         Item::Pkcs1Key(key) => println!("rsa pkcs1 key {:?}", key),
 //!         Item::Pkcs8Key(key) => println!("pkcs8 key {:?}", key),
 //!         Item::Sec1Key(key) => println!("sec1 ec key {:?}", key),
@@ -67,8 +68,8 @@ pub use pemfile::{read_one_from_slice, Error, Item};
 use pki_types::PrivateKeyDer;
 #[cfg(feature = "std")]
 use pki_types::{
-    CertificateDer, CertificateRevocationListDer, PrivatePkcs1KeyDer, PrivatePkcs8KeyDer,
-    PrivateSec1KeyDer,
+    CertificateDer, CertificateRevocationListDer, CertificateSigningRequestDer, PrivatePkcs1KeyDer,
+    PrivatePkcs8KeyDer, PrivateSec1KeyDer,
 };
 
 #[cfg(feature = "std")]
@@ -103,7 +104,29 @@ pub fn private_key(rd: &mut dyn io::BufRead) -> Result<Option<PrivateKeyDer<'sta
             Item::Pkcs1Key(key) => return Ok(Some(key.into())),
             Item::Pkcs8Key(key) => return Ok(Some(key.into())),
             Item::Sec1Key(key) => return Ok(Some(key.into())),
-            Item::X509Certificate(_) | Item::Crl(_) => continue,
+            Item::X509Certificate(_) | Item::Crl(_) | Item::Csr(_) => continue,
+        }
+    }
+
+    Ok(None)
+}
+
+/// Return the first certificate signing request (CSR) found in `rd`.
+///
+/// Yields the first PEM section describing a certificate signing request, or an error if a
+/// problem occurs while trying to read PEM sections.
+#[cfg(feature = "std")]
+pub fn csr(
+    rd: &mut dyn io::BufRead,
+) -> Result<Option<CertificateSigningRequestDer<'static>>, io::Error> {
+    for result in iter::from_fn(move || read_one(rd).transpose()) {
+        match result? {
+            Item::Csr(csr) => return Ok(Some(csr)),
+            Item::Pkcs1Key(_)
+            | Item::Pkcs8Key(_)
+            | Item::Sec1Key(_)
+            | Item::X509Certificate(_)
+            | Item::Crl(_) => continue,
         }
     }
 
