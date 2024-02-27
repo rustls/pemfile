@@ -215,14 +215,8 @@ fn read_one_impl(
     }
 
     if section.is_some() {
-        let mut trim = 0;
-        for &b in line.iter().rev() {
-            match b {
-                b'\n' | b'\r' | b' ' => trim += 1,
-                _ => break,
-            }
-        }
-        b64buf.extend(&line[..line.len() - trim]);
+        // Extend b64buf without leading or trailing whitespace
+        b64buf.extend(trim_ascii(line));
     }
 
     Ok(ControlFlow::Continue(()))
@@ -266,6 +260,35 @@ fn read_until_newline<R: io::BufRead + ?Sized>(
     }
 }
 
+/// Trim contiguous leading and trailing whitespace from `line`.
+///
+/// We use [u8::is_ascii_whitespace] to determine what is whitespace.
+// TODO(XXX): Replace with `[u8]::trim_ascii` once stabilized[0] and available in our MSRV.
+//   [0]: https://github.com/rust-lang/rust/issues/94035
+const fn trim_ascii(line: &[u8]) -> &[u8] {
+    let mut bytes = line;
+
+    // Note: A pattern matching based approach (instead of indexing) allows
+    // making the function const.
+    while let [first, rest @ ..] = bytes {
+        if first.is_ascii_whitespace() {
+            bytes = rest;
+        } else {
+            break;
+        }
+    }
+
+    while let [rest @ .., last] = bytes {
+        if last.is_ascii_whitespace() {
+            bytes = rest;
+        } else {
+            break;
+        }
+    }
+
+    bytes
+}
+
 /// Extract and return all PEM sections by reading `rd`.
 #[cfg(feature = "std")]
 pub fn read_all(rd: &mut dyn io::BufRead) -> impl Iterator<Item = Result<Item, io::Error>> + '_ {
@@ -284,3 +307,31 @@ mod base64 {
     );
 }
 use self::base64::Engine;
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_trim_ascii() {
+        let tests: &[(&[u8], &[u8])] = &[
+            (b"", b""),
+            (b"   hello world   ", b"hello world"),
+            (b"   hello\t\r\nworld   ", b"hello\t\r\nworld"),
+            (b"\n\r  \ttest\t  \r\n", b"test"),
+            (b"   \r\n  ", b""),
+            (b"no trimming needed", b"no trimming needed"),
+            (
+                b"\n\n content\n\n more content\n\n",
+                b"content\n\n more content",
+            ),
+        ];
+
+        for &(input, expected) in tests {
+            assert_eq!(
+                super::trim_ascii(input),
+                expected,
+                "Failed for input: {:?}",
+                input,
+            );
+        }
+    }
+}
