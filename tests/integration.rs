@@ -196,3 +196,15 @@ fn different_line_endings() {
         assert!(matches!(cert, rustls_pemfile::Item::X509Certificate(_)));
     }
 }
+
+#[test]
+fn whitespace_prefix() {
+    let items = rustls_pemfile::read_all(&mut BufReader::new(
+        &include_bytes!("data/whitespace-prefix.crt")[..],
+    ))
+    .collect::<Result<Vec<_>, _>>()
+    .unwrap();
+
+    assert_eq!(items.len(), 1);
+    assert!(matches!(items[0], rustls_pemfile::Item::X509Certificate(_)));
+}
