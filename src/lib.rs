@@ -49,10 +49,10 @@
     unused_extern_crates,
     unused_qualifications
 )]
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 extern crate alloc;
-#[cfg(all(feature = "std", not(test)))]
+#[cfg(any(feature = "std", test))]
 extern crate std;
 
 #[cfg(test)]
