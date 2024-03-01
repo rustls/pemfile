@@ -17,13 +17,13 @@ jobs:
         with:
           components: clippy
       - uses: actions/checkout@v4
-      - run: cargo clippy --all-features --all-targets
+      - run: cargo clippy --locked --all-features --all-targets
   rustdoc:
     runs-on: ubuntu-20.04
     steps:
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/checkout@v4
-      - run: cargo doc --all-features
+      - run: cargo doc --locked --all-features
   build:
     name: "Build and test"
     runs-on: ${{ matrix.os }}
@@ -52,19 +52,19 @@ jobs:
           targets: x86_64-unknown-none
 
       - name: cargo test (debug)
-        run: cargo test
+        run: cargo test --locked
         env:
           RUST_BACKTRACE: 1
           RUSTFLAGS: "-D warnings"
 
       - name: cargo test (release)
-        run: cargo test --release
+        run: cargo test --locked --release
         env:
           RUSTFLAGS: "-D warnings"
 
         # this target does _not_ include the libstd crate in its sysroot
         # it will catch unwanted usage of libstd in _dependencies_
       - name: cargo build no-std mode
-        run: cargo build --no-default-features --target x86_64-unknown-none
+        run: cargo build --locked --no-default-features --target x86_64-unknown-none
         env:
           RUSTFLAGS: "-D warnings"
