@@ -10,7 +10,7 @@ repository = "https://github.com/rustls/pemfile"
 categories = ["network-programming", "cryptography"]
 
 [dependencies]
-base64 = { version = "0.21", default-features = false, features = ["alloc"] }
+base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 pki-types = { package = "rustls-pki-types", version = "1.3" }
 
 [dev-dependencies]
