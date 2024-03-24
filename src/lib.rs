@@ -71,6 +71,8 @@ use pki_types::{
     CertificateDer, CertificateRevocationListDer, CertificateSigningRequestDer, PrivatePkcs1KeyDer,
     PrivatePkcs8KeyDer, PrivateSec1KeyDer,
 };
+/// Base64 decoding.
+pub mod base64;
 
 #[cfg(feature = "std")]
 use core::iter;
