@@ -52,7 +52,7 @@ mod unit {
                             -----END RSA PRIVATE KEY-----\n";
         assert_eq!(
             format!("{:?}", check_io(input)),
-            "Err(Custom { kind: InvalidData, error: \"InvalidByte(1, 61)\" })"
+            "Err(Custom { kind: InvalidData, error: \"InvalidInput { at_offset: 2 }\" })"
         );
         assert!(matches!(check_slice(input), Err(Error::Base64Decode(_))));
     }

@@ -4,6 +4,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use core::iter;
+use core::mem;
 use core::ops::ControlFlow;
 #[cfg(feature = "std")]
 use std::io::{self, ErrorKind};
@@ -12,6 +13,8 @@ use pki_types::{
     CertificateDer, CertificateRevocationListDer, CertificateSigningRequestDer, PrivatePkcs1KeyDer,
     PrivatePkcs8KeyDer, PrivateSec1KeyDer,
 };
+
+use crate::base64;
 
 /// The contents of a single recognised block in a PEM file.
 #[non_exhaustive]
@@ -74,11 +77,14 @@ pub enum Error {
 /// - Otherwise each decoded section is returned with a `Ok(Some((Item::..., remainder)))` where
 ///   `remainder` is the part of the `input` that follows the returned section
 pub fn read_one_from_slice(mut input: &[u8]) -> Result<Option<(Item, &[u8])>, Error> {
-    let mut b64buf = Vec::with_capacity(1024);
+    let mut decoder = DecodedOutput::new();
     let mut section = None::<(Vec<_>, Vec<_>)>;
 
     loop {
-        let next_line = if let Some(index) = input.iter().position(|byte| *byte == b'\n') {
+        let next_line = if let Some(index) = input
+            .iter()
+            .position(|byte| *byte == b'\n')
+        {
             let (line, newline_plus_remainder) = input.split_at(index);
             input = &newline_plus_remainder[1..];
             Some(line)
@@ -86,7 +92,7 @@ pub fn read_one_from_slice(mut input: &[u8]) -> Result<Option<(Item, &[u8])>, Er
             None
         };
 
-        match read_one_impl(next_line, &mut section, &mut b64buf)? {
+        match read_one_impl(next_line, &mut section, &mut decoder)? {
             ControlFlow::Continue(()) => continue,
             ControlFlow::Break(item) => return Ok(item.map(|item| (item, input))),
         }
@@ -103,7 +109,7 @@ pub fn read_one_from_slice(mut input: &[u8]) -> Result<Option<(Item, &[u8])>, Er
 /// `for item in iter::from_fn(|| read_one(rd).transpose()) { ... }`
 #[cfg(feature = "std")]
 pub fn read_one(rd: &mut dyn io::BufRead) -> Result<Option<Item>, io::Error> {
-    let mut b64buf = Vec::with_capacity(1024);
+    let mut decoder = DecodedOutput::new();
     let mut section = None::<(Vec<_>, Vec<_>)>;
     let mut line = Vec::with_capacity(80);
 
@@ -117,7 +123,7 @@ pub fn read_one(rd: &mut dyn io::BufRead) -> Result<Option<Item>, io::Error> {
             Some(line.as_slice())
         };
 
-        match read_one_impl(next_line, &mut section, &mut b64buf) {
+        match read_one_impl(next_line, &mut section, &mut decoder) {
             Ok(ControlFlow::Break(opt)) => return Ok(opt),
             Ok(ControlFlow::Continue(())) => continue,
             Err(e) => {
@@ -148,7 +154,7 @@ pub fn read_one(rd: &mut dyn io::BufRead) -> Result<Option<Item>, io::Error> {
 fn read_one_impl(
     next_line: Option<&[u8]>,
     section: &mut Option<(Vec<u8>, Vec<u8>)>,
-    b64buf: &mut Vec<u8>,
+    decoder: &mut DecodedOutput,
 ) -> Result<ControlFlow<Option<Item>, ()>, Error> {
     let line = if let Some(line) = next_line {
         line
@@ -190,9 +196,7 @@ fn read_one_impl(
 
     if let Some((section_type, end_marker)) = section.as_ref() {
         if line.starts_with(end_marker) {
-            let der = base64::ENGINE
-                .decode(&b64buf)
-                .map_err(|err| Error::Base64Decode(format!("{err:?}")))?;
+            let der = decoder.finish()?;
 
             let item = match section_type.as_slice() {
                 b"CERTIFICATE" => Some(Item::X509Certificate(der.into())),
@@ -203,7 +207,6 @@ fn read_one_impl(
                 b"CERTIFICATE REQUEST" => Some(Item::Csr(der.into())),
                 _ => {
                     *section = None;
-                    b64buf.clear();
                     None
                 }
             };
@@ -215,8 +218,7 @@ fn read_one_impl(
     }
 
     if section.is_some() {
-        // Extend b64buf without leading or trailing whitespace
-        b64buf.extend(trim_ascii(line));
+        decoder.add(line)?;
     }
 
     Ok(ControlFlow::Continue(()))
@@ -260,78 +262,49 @@ fn read_until_newline<R: io::BufRead + ?Sized>(
     }
 }
 
-/// Trim contiguous leading and trailing whitespace from `line`.
-///
-/// We use [u8::is_ascii_whitespace] to determine what is whitespace.
-// TODO(XXX): Replace with `[u8]::trim_ascii` once stabilized[0] and available in our MSRV.
-//   [0]: https://github.com/rust-lang/rust/issues/94035
-const fn trim_ascii(line: &[u8]) -> &[u8] {
-    let mut bytes = line;
+struct DecodedOutput {
+    decoder: base64::Decoder,
+    buffer: Vec<u8>,
+}
 
-    // Note: A pattern matching based approach (instead of indexing) allows
-    // making the function const.
-    while let [first, rest @ ..] = bytes {
-        if first.is_ascii_whitespace() {
-            bytes = rest;
-        } else {
-            break;
+impl DecodedOutput {
+    fn new() -> Self {
+        Self {
+            decoder: base64::Decoder::new(base64::Pem),
+            buffer: Vec::new(),
         }
     }
 
-    while let [rest @ .., last] = bytes {
-        if last.is_ascii_whitespace() {
-            bytes = rest;
-        } else {
-            break;
-        }
+    fn add(&mut self, data: &[u8]) -> Result<(), Error> {
+        let orig_len = self.buffer.len();
+        self.buffer
+            .resize(orig_len + base64::decode_len_estimate(data.len()), 0);
+
+        let len = self
+            .decoder
+            .update(data, &mut self.buffer[orig_len..])
+            .map_err(|err| Error::Base64Decode(format!("{err:?}")))?;
+        self.buffer.truncate(orig_len + len);
+        Ok(())
     }
 
-    bytes
+    fn finish(&mut self) -> Result<Vec<u8>, Error> {
+        let decoder = mem::replace(&mut self.decoder, base64::Decoder::new(base64::Pem));
+        let mut buffer = mem::take(&mut self.buffer);
+
+        let orig_len = buffer.len();
+        buffer.resize(orig_len + 3, 0);
+
+        let len = decoder
+            .finish(&[], &mut buffer[orig_len..])
+            .map_err(|err| Error::Base64Decode(format!("{err:?}")))?;
+        buffer.truncate(orig_len + len);
+        Ok(buffer)
+    }
 }
 
 /// Extract and return all PEM sections by reading `rd`.
 #[cfg(feature = "std")]
 pub fn read_all(rd: &mut dyn io::BufRead) -> impl Iterator<Item = Result<Item, io::Error>> + '_ {
     iter::from_fn(move || read_one(rd).transpose())
-}
-
-mod base64 {
-    use base64::alphabet::STANDARD;
-    use base64::engine::general_purpose::{GeneralPurpose, GeneralPurposeConfig};
-    use base64::engine::DecodePaddingMode;
-    pub(super) use base64::engine::Engine;
-
-    pub(super) const ENGINE: GeneralPurpose = GeneralPurpose::new(
-        &STANDARD,
-        GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent),
-    );
-}
-use self::base64::Engine;
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_trim_ascii() {
-        let tests: &[(&[u8], &[u8])] = &[
-            (b"", b""),
-            (b"   hello world   ", b"hello world"),
-            (b"   hello\t\r\nworld   ", b"hello\t\r\nworld"),
-            (b"\n\r  \ttest\t  \r\n", b"test"),
-            (b"   \r\n  ", b""),
-            (b"no trimming needed", b"no trimming needed"),
-            (
-                b"\n\n content\n\n more content\n\n",
-                b"content\n\n more content",
-            ),
-        ];
-
-        for &(input, expected) in tests {
-            assert_eq!(
-                super::trim_ascii(input),
-                expected,
-                "Failed for input: {:?}",
-                input,
-            );
-        }
-    }
 }

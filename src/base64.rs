@@ -1,5 +1,5 @@
-use alloc::vec::Vec;
 use alloc::vec;
+use alloc::vec::Vec;
 
 /// A codepoint in base64.
 ///
@@ -728,7 +728,7 @@ pub enum Error {
         ///
         /// `at_offset` relates to the current input (not the whole input).  This
         /// detail only matters in incremental mode (using a [`Decoder`] directly.)
-        at_offset: usize
+        at_offset: usize,
     },
 }
 
