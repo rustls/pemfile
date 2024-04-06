@@ -225,10 +225,7 @@ fn read_one_impl(
 // Ported from https://github.com/rust-lang/rust/blob/91cfcb021935853caa06698b759c293c09d1e96a/library/std/src/io/mod.rs#L1990 and
 // modified to look for our accepted newlines.
 #[cfg(feature = "std")]
-fn read_until_newline<R: io::BufRead + ?Sized>(
-    r: &mut R,
-    buf: &mut Vec<u8>,
-) -> std::io::Result<usize> {
+fn read_until_newline<R: io::BufRead + ?Sized>(r: &mut R, buf: &mut Vec<u8>) -> io::Result<usize> {
     let mut read = 0;
     loop {
         let (done, used) = {
