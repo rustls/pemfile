@@ -22,6 +22,11 @@ pub enum Item {
     /// Appears as "CERTIFICATE" in PEM files.
     X509Certificate(CertificateDer<'static>),
 
+    /// A DER-encoded RawPublicKey certificate.
+    ///
+    /// Appears as "PUBLIC KEY" in PEM files.
+    RawPublicKeyCertificate(CertificateDer<'static>),
+
     /// A DER-encoded plaintext RSA private key; as specified in PKCS #1/RFC 3447
     ///
     /// Appears as "RSA PRIVATE KEY" in PEM files.
@@ -78,7 +83,10 @@ pub fn read_one_from_slice(mut input: &[u8]) -> Result<Option<(Item, &[u8])>, Er
     let mut section = None::<(Vec<_>, Vec<_>)>;
 
     loop {
-        let next_line = if let Some(index) = input.iter().position(|byte| *byte == b'\n') {
+        let next_line = if let Some(index) = input
+            .iter()
+            .position(|byte| *byte == b'\n')
+        {
             let (line, newline_plus_remainder) = input.split_at(index);
             input = &newline_plus_remainder[1..];
             Some(line)
@@ -196,6 +204,7 @@ fn read_one_impl(
 
             let item = match section_type.as_slice() {
                 b"CERTIFICATE" => Some(Item::X509Certificate(der.into())),
+                b"PUBLIC KEY" => Some(Item::RawPublicKeyCertificate(der.into())),
                 b"RSA PRIVATE KEY" => Some(Item::Pkcs1Key(der.into())),
                 b"PRIVATE KEY" => Some(Item::Pkcs8Key(der.into())),
                 b"EC PRIVATE KEY" => Some(Item::Sec1Key(der.into())),
