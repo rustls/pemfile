@@ -55,6 +55,7 @@ extern crate alloc;
 #[cfg(any(feature = "std", test))]
 extern crate std;
 
+mod base64;
 #[cfg(test)]
 #[cfg(feature = "std")]
 mod tests;
