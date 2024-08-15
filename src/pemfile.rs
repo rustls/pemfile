@@ -1,6 +1,7 @@
 use alloc::borrow::ToOwned;
 use alloc::format;
 use alloc::string::String;
+use alloc::vec;
 use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use core::iter;
@@ -12,6 +13,8 @@ use pki_types::{
     CertificateDer, CertificateRevocationListDer, CertificateSigningRequestDer, PrivatePkcs1KeyDer,
     PrivatePkcs8KeyDer, PrivateSec1KeyDer, SubjectPublicKeyInfoDer,
 };
+
+use crate::base64;
 
 /// The contents of a single recognised block in a PEM file.
 #[non_exhaustive]
@@ -195,9 +198,17 @@ fn read_one_impl(
 
     if let Some((section_type, end_marker)) = section.as_ref() {
         if line.starts_with(end_marker) {
-            let der = base64::ENGINE
-                .decode(&b64buf)
-                .map_err(|err| Error::Base64Decode(format!("{err:?}")))?;
+            let mut der = vec![0u8; base64::decoded_length(b64buf.len())];
+
+            let der_len = match &section_type[..] {
+                b"RSA PRIVATE KEY" | b"PRIVATE KEY" | b"EC PRIVATE KEY" => {
+                    base64::decode_secret(b64buf, &mut der)
+                }
+                _ => base64::decode_public(b64buf, &mut der),
+            }
+            .map_err(|err| Error::Base64Decode(format!("{err:?}")))?
+            .len();
+            der.truncate(der_len);
 
             let item = match section_type.as_slice() {
                 b"CERTIFICATE" => Some(Item::X509Certificate(der.into())),
@@ -221,8 +232,7 @@ fn read_one_impl(
     }
 
     if section.is_some() {
-        // Extend b64buf without leading or trailing whitespace
-        b64buf.extend(trim_ascii(line));
+        b64buf.extend(line);
     }
 
     Ok(ControlFlow::Continue(()))
@@ -263,78 +273,8 @@ fn read_until_newline<R: io::BufRead + ?Sized>(r: &mut R, buf: &mut Vec<u8>) -> 
     }
 }
 
-/// Trim contiguous leading and trailing whitespace from `line`.
-///
-/// We use [u8::is_ascii_whitespace] to determine what is whitespace.
-// TODO(XXX): Replace with `[u8]::trim_ascii` once stabilized[0] and available in our MSRV.
-//   [0]: https://github.com/rust-lang/rust/issues/94035
-const fn trim_ascii(line: &[u8]) -> &[u8] {
-    let mut bytes = line;
-
-    // Note: A pattern matching based approach (instead of indexing) allows
-    // making the function const.
-    while let [first, rest @ ..] = bytes {
-        if first.is_ascii_whitespace() {
-            bytes = rest;
-        } else {
-            break;
-        }
-    }
-
-    while let [rest @ .., last] = bytes {
-        if last.is_ascii_whitespace() {
-            bytes = rest;
-        } else {
-            break;
-        }
-    }
-
-    bytes
-}
-
 /// Extract and return all PEM sections by reading `rd`.
 #[cfg(feature = "std")]
 pub fn read_all(rd: &mut dyn io::BufRead) -> impl Iterator<Item = Result<Item, io::Error>> + '_ {
     iter::from_fn(move || read_one(rd).transpose())
-}
-
-mod base64 {
-    use base64::alphabet::STANDARD;
-    use base64::engine::general_purpose::{GeneralPurpose, GeneralPurposeConfig};
-    use base64::engine::DecodePaddingMode;
-    pub(super) use base64::engine::Engine;
-
-    pub(super) const ENGINE: GeneralPurpose = GeneralPurpose::new(
-        &STANDARD,
-        GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent),
-    );
-}
-use self::base64::Engine;
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_trim_ascii() {
-        let tests: &[(&[u8], &[u8])] = &[
-            (b"", b""),
-            (b"   hello world   ", b"hello world"),
-            (b"   hello\t\r\nworld   ", b"hello\t\r\nworld"),
-            (b"\n\r  \ttest\t  \r\n", b"test"),
-            (b"   \r\n  ", b""),
-            (b"no trimming needed", b"no trimming needed"),
-            (
-                b"\n\n content\n\n more content\n\n",
-                b"content\n\n more content",
-            ),
-        ];
-
-        for &(input, expected) in tests {
-            assert_eq!(
-                super::trim_ascii(input),
-                expected,
-                "Failed for input: {:?}",
-                input,
-            );
-        }
-    }
 }
