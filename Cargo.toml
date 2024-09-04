@@ -10,15 +10,14 @@ repository = "https://github.com/rustls/pemfile"
 categories = ["network-programming", "cryptography"]
 
 [dependencies]
-base64 = { version = "0.22", default-features = false, features = ["alloc"] }
-pki-types = { package = "rustls-pki-types", version = "1.7" }
+pki-types = { package = "rustls-pki-types", version = "1.9" }
 
 [dev-dependencies]
 bencher = "0.1.5"
 
 [features]
 default = ["std"]
-std = ["base64/std"]
+std = ["pki-types/std"]
 
 [[bench]]
 name = "benchmark"

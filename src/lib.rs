@@ -59,7 +59,6 @@ extern crate std;
 #[cfg(feature = "std")]
 mod tests;
 
-/// --- Main crate APIs:
 mod pemfile;
 #[cfg(feature = "std")]
 pub use pemfile::{read_all, read_one};

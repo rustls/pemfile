@@ -1,16 +1,14 @@
-use alloc::borrow::ToOwned;
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use core::iter;
-use core::ops::ControlFlow;
 #[cfg(feature = "std")]
 use std::io::{self, ErrorKind};
 
 use pki_types::{
-    CertificateDer, CertificateRevocationListDer, CertificateSigningRequestDer, PrivatePkcs1KeyDer,
-    PrivatePkcs8KeyDer, PrivateSec1KeyDer, SubjectPublicKeyInfoDer,
+    pem, CertificateDer, CertificateRevocationListDer, CertificateSigningRequestDer,
+    PrivatePkcs1KeyDer, PrivatePkcs8KeyDer, PrivateSec1KeyDer, SubjectPublicKeyInfoDer,
 };
 
 /// The contents of a single recognised block in a PEM file.
@@ -53,7 +51,56 @@ pub enum Item {
     Csr(CertificateSigningRequestDer<'static>),
 }
 
+impl Item {
+    #[cfg(feature = "std")]
+    fn from_buf(rd: &mut dyn io::BufRead) -> Result<Option<Self>, pem::Error> {
+        loop {
+            match pem::from_buf(rd)? {
+                Some((kind, data)) => match Self::from_kind(kind, data) {
+                    Some(item) => return Ok(Some(item)),
+                    None => continue,
+                },
+
+                None => return Ok(None),
+            }
+        }
+    }
+
+    fn from_slice(pem: &[u8]) -> Result<Option<(Self, &[u8])>, pem::Error> {
+        let mut iter = <(pem::SectionKind, Vec<u8>) as pem::PemObject>::pem_slice_iter(pem);
+
+        for found in iter.by_ref() {
+            match found {
+                Ok((kind, data)) => match Self::from_kind(kind, data) {
+                    Some(item) => return Ok(Some((item, iter.remainder()))),
+                    None => continue,
+                },
+                Err(err) => return Err(err.into()),
+            }
+        }
+
+        Ok(None)
+    }
+
+    fn from_kind(kind: pem::SectionKind, data: Vec<u8>) -> Option<Self> {
+        use pem::SectionKind::*;
+        match kind {
+            Certificate => Some(Self::X509Certificate(data.into())),
+            PublicKey => Some(Self::SubjectPublicKeyInfo(data.into())),
+            RsaPrivateKey => Some(Self::Pkcs1Key(data.into())),
+            PrivateKey => Some(Self::Pkcs8Key(data.into())),
+            EcPrivateKey => Some(Self::Sec1Key(data.into())),
+            Crl => Some(Self::Crl(data.into())),
+            Csr => Some(Self::Csr(data.into())),
+            _ => None,
+        }
+    }
+}
+
 /// Errors that may arise when parsing the contents of a PEM file
+///
+/// This differs from [`rustls_pki_types::pem::Error`] because it is `PartialEq`;
+/// it is retained for compatibility.
 #[derive(Debug, PartialEq)]
 pub enum Error {
     /// a section is missing its "END marker" line
@@ -72,30 +119,53 @@ pub enum Error {
     Base64Decode(String),
 }
 
+#[cfg(feature = "std")]
+impl From<Error> for io::Error {
+    fn from(error: Error) -> Self {
+        match error {
+            Error::MissingSectionEnd { end_marker } => io::Error::new(
+                ErrorKind::InvalidData,
+                format!(
+                    "section end {:?} missing",
+                    String::from_utf8_lossy(&end_marker)
+                ),
+            ),
+
+            Error::IllegalSectionStart { line } => io::Error::new(
+                ErrorKind::InvalidData,
+                format!(
+                    "illegal section start: {:?}",
+                    String::from_utf8_lossy(&line)
+                ),
+            ),
+
+            Error::Base64Decode(err) => io::Error::new(ErrorKind::InvalidData, err),
+        }
+    }
+}
+
+impl From<pem::Error> for Error {
+    fn from(error: pem::Error) -> Self {
+        match error {
+            pem::Error::MissingSectionEnd { end_marker } => Error::MissingSectionEnd { end_marker },
+            pem::Error::IllegalSectionStart { line } => Error::IllegalSectionStart { line },
+            pem::Error::Base64Decode(str) => Error::Base64Decode(str),
+
+            // this is a necessary bodge to funnel any new errors into our existing type
+            // (to which we can add no new variants)
+            other => Error::Base64Decode(format!("{other:?}")),
+        }
+    }
+}
+
 /// Extract and decode the next PEM section from `input`
 ///
 /// - `Ok(None)` is returned if there is no PEM section to read from `input`
 /// - Syntax errors and decoding errors produce a `Err(...)`
 /// - Otherwise each decoded section is returned with a `Ok(Some((Item::..., remainder)))` where
 ///   `remainder` is the part of the `input` that follows the returned section
-pub fn read_one_from_slice(mut input: &[u8]) -> Result<Option<(Item, &[u8])>, Error> {
-    let mut b64buf = Vec::with_capacity(1024);
-    let mut section = None::<(Vec<_>, Vec<_>)>;
-
-    loop {
-        let next_line = if let Some(index) = input.iter().position(|byte| *byte == b'\n') {
-            let (line, newline_plus_remainder) = input.split_at(index);
-            input = &newline_plus_remainder[1..];
-            Some(line)
-        } else {
-            None
-        };
-
-        match read_one_impl(next_line, &mut section, &mut b64buf)? {
-            ControlFlow::Continue(()) => continue,
-            ControlFlow::Break(item) => return Ok(item.map(|item| (item, input))),
-        }
-    }
+pub fn read_one_from_slice(input: &[u8]) -> Result<Option<(Item, &[u8])>, Error> {
+    Item::from_slice(input).map_err(Into::into)
 }
 
 /// Extract and decode the next PEM section from `rd`.
@@ -108,233 +178,14 @@ pub fn read_one_from_slice(mut input: &[u8]) -> Result<Option<(Item, &[u8])>, Er
 /// `for item in iter::from_fn(|| read_one(rd).transpose()) { ... }`
 #[cfg(feature = "std")]
 pub fn read_one(rd: &mut dyn io::BufRead) -> Result<Option<Item>, io::Error> {
-    let mut b64buf = Vec::with_capacity(1024);
-    let mut section = None::<(Vec<_>, Vec<_>)>;
-    let mut line = Vec::with_capacity(80);
-
-    loop {
-        line.clear();
-        let len = read_until_newline(rd, &mut line)?;
-
-        let next_line = if len == 0 {
-            None
-        } else {
-            Some(line.as_slice())
-        };
-
-        match read_one_impl(next_line, &mut section, &mut b64buf) {
-            Ok(ControlFlow::Break(opt)) => return Ok(opt),
-            Ok(ControlFlow::Continue(())) => continue,
-            Err(e) => {
-                return Err(match e {
-                    Error::MissingSectionEnd { end_marker } => io::Error::new(
-                        ErrorKind::InvalidData,
-                        format!(
-                            "section end {:?} missing",
-                            String::from_utf8_lossy(&end_marker)
-                        ),
-                    ),
-
-                    Error::IllegalSectionStart { line } => io::Error::new(
-                        ErrorKind::InvalidData,
-                        format!(
-                            "illegal section start: {:?}",
-                            String::from_utf8_lossy(&line)
-                        ),
-                    ),
-
-                    Error::Base64Decode(err) => io::Error::new(ErrorKind::InvalidData, err),
-                });
-            }
-        }
-    }
-}
-
-fn read_one_impl(
-    next_line: Option<&[u8]>,
-    section: &mut Option<(Vec<u8>, Vec<u8>)>,
-    b64buf: &mut Vec<u8>,
-) -> Result<ControlFlow<Option<Item>, ()>, Error> {
-    let line = if let Some(line) = next_line {
-        line
-    } else {
-        // EOF
-        return match section.take() {
-            Some((_, end_marker)) => Err(Error::MissingSectionEnd { end_marker }),
-            None => Ok(ControlFlow::Break(None)),
-        };
-    };
-
-    if line.starts_with(b"-----BEGIN ") {
-        let (mut trailer, mut pos) = (0, line.len());
-        for (i, &b) in line.iter().enumerate().rev() {
-            match b {
-                b'-' => {
-                    trailer += 1;
-                    pos = i;
-                }
-                b'\n' | b'\r' | b' ' => continue,
-                _ => break,
-            }
-        }
-
-        if trailer != 5 {
-            return Err(Error::IllegalSectionStart {
-                line: line.to_vec(),
-            });
-        }
-
-        let ty = &line[11..pos];
-        let mut end = Vec::with_capacity(10 + 4 + ty.len());
-        end.extend_from_slice(b"-----END ");
-        end.extend_from_slice(ty);
-        end.extend_from_slice(b"-----");
-        *section = Some((ty.to_owned(), end));
-        return Ok(ControlFlow::Continue(()));
-    }
-
-    if let Some((section_type, end_marker)) = section.as_ref() {
-        if line.starts_with(end_marker) {
-            let der = base64::ENGINE
-                .decode(&b64buf)
-                .map_err(|err| Error::Base64Decode(format!("{err:?}")))?;
-
-            let item = match section_type.as_slice() {
-                b"CERTIFICATE" => Some(Item::X509Certificate(der.into())),
-                b"PUBLIC KEY" => Some(Item::SubjectPublicKeyInfo(der.into())),
-                b"RSA PRIVATE KEY" => Some(Item::Pkcs1Key(der.into())),
-                b"PRIVATE KEY" => Some(Item::Pkcs8Key(der.into())),
-                b"EC PRIVATE KEY" => Some(Item::Sec1Key(der.into())),
-                b"X509 CRL" => Some(Item::Crl(der.into())),
-                b"CERTIFICATE REQUEST" => Some(Item::Csr(der.into())),
-                _ => {
-                    *section = None;
-                    b64buf.clear();
-                    None
-                }
-            };
-
-            if item.is_some() {
-                return Ok(ControlFlow::Break(item));
-            }
-        }
-    }
-
-    if section.is_some() {
-        // Extend b64buf without leading or trailing whitespace
-        b64buf.extend(trim_ascii(line));
-    }
-
-    Ok(ControlFlow::Continue(()))
-}
-
-// Ported from https://github.com/rust-lang/rust/blob/91cfcb021935853caa06698b759c293c09d1e96a/library/std/src/io/mod.rs#L1990 and
-// modified to look for our accepted newlines.
-#[cfg(feature = "std")]
-fn read_until_newline<R: io::BufRead + ?Sized>(r: &mut R, buf: &mut Vec<u8>) -> io::Result<usize> {
-    let mut read = 0;
-    loop {
-        let (done, used) = {
-            let available = match r.fill_buf() {
-                Ok(n) => n,
-                Err(ref e) if e.kind() == ErrorKind::Interrupted => continue,
-                Err(e) => return Err(e),
-            };
-            match available
-                .iter()
-                .copied()
-                .position(|b| b == b'\n' || b == b'\r')
-            {
-                Some(i) => {
-                    buf.extend_from_slice(&available[..=i]);
-                    (true, i + 1)
-                }
-                None => {
-                    buf.extend_from_slice(available);
-                    (false, available.len())
-                }
-            }
-        };
-        r.consume(used);
-        read += used;
-        if done || used == 0 {
-            return Ok(read);
-        }
-    }
-}
-
-/// Trim contiguous leading and trailing whitespace from `line`.
-///
-/// We use [u8::is_ascii_whitespace] to determine what is whitespace.
-// TODO(XXX): Replace with `[u8]::trim_ascii` once stabilized[0] and available in our MSRV.
-//   [0]: https://github.com/rust-lang/rust/issues/94035
-const fn trim_ascii(line: &[u8]) -> &[u8] {
-    let mut bytes = line;
-
-    // Note: A pattern matching based approach (instead of indexing) allows
-    // making the function const.
-    while let [first, rest @ ..] = bytes {
-        if first.is_ascii_whitespace() {
-            bytes = rest;
-        } else {
-            break;
-        }
-    }
-
-    while let [rest @ .., last] = bytes {
-        if last.is_ascii_whitespace() {
-            bytes = rest;
-        } else {
-            break;
-        }
-    }
-
-    bytes
+    Item::from_buf(rd).map_err(|err| match err {
+        pem::Error::Io(io) => io,
+        other => Error::from(other).into(),
+    })
 }
 
 /// Extract and return all PEM sections by reading `rd`.
 #[cfg(feature = "std")]
 pub fn read_all(rd: &mut dyn io::BufRead) -> impl Iterator<Item = Result<Item, io::Error>> + '_ {
     iter::from_fn(move || read_one(rd).transpose())
-}
-
-mod base64 {
-    use base64::alphabet::STANDARD;
-    use base64::engine::general_purpose::{GeneralPurpose, GeneralPurposeConfig};
-    use base64::engine::DecodePaddingMode;
-    pub(super) use base64::engine::Engine;
-
-    pub(super) const ENGINE: GeneralPurpose = GeneralPurpose::new(
-        &STANDARD,
-        GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent),
-    );
-}
-use self::base64::Engine;
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_trim_ascii() {
-        let tests: &[(&[u8], &[u8])] = &[
-            (b"", b""),
-            (b"   hello world   ", b"hello world"),
-            (b"   hello\t\r\nworld   ", b"hello\t\r\nworld"),
-            (b"\n\r  \ttest\t  \r\n", b"test"),
-            (b"   \r\n  ", b""),
-            (b"no trimming needed", b"no trimming needed"),
-            (
-                b"\n\n content\n\n more content\n\n",
-                b"content\n\n more content",
-            ),
-        ];
-
-        for &(input, expected) in tests {
-            assert_eq!(
-                super::trim_ascii(input),
-                expected,
-                "Failed for input: {:?}",
-                input,
-            );
-        }
-    }
 }
