@@ -61,6 +61,12 @@ mod tests;
 
 mod pemfile;
 #[cfg(feature = "std")]
+use core::iter;
+/// --- Legacy APIs:
+#[cfg(feature = "std")]
+use std::io;
+
+#[cfg(feature = "std")]
 pub use pemfile::{read_all, read_one};
 pub use pemfile::{read_one_from_slice, Error, Item};
 #[cfg(feature = "std")]
@@ -70,12 +76,6 @@ use pki_types::{
     CertificateDer, CertificateRevocationListDer, CertificateSigningRequestDer, PrivatePkcs1KeyDer,
     PrivatePkcs8KeyDer, PrivateSec1KeyDer, SubjectPublicKeyInfoDer,
 };
-
-#[cfg(feature = "std")]
-use core::iter;
-/// --- Legacy APIs:
-#[cfg(feature = "std")]
-use std::io;
 
 /// Return an iterator over certificates from `rd`.
 ///
