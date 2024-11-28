@@ -75,7 +75,7 @@ impl Item {
                     Some(item) => return Ok(Some((item, iter.remainder()))),
                     None => continue,
                 },
-                Err(err) => return Err(err.into()),
+                Err(err) => return Err(err),
             }
         }
 
