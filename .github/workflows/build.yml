@@ -15,6 +15,8 @@ jobs:
         with:
           components: rustfmt
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - run: cargo fmt --all -- --check
   clippy:
     runs-on: ubuntu-latest
@@ -23,12 +25,16 @@ jobs:
         with:
           components: clippy
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - run: cargo clippy --locked --all-features --all-targets
   rustdoc:
     runs-on: ubuntu-latest
     steps:
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - run: cargo doc --locked --all-features
   build:
     name: "Build and test"
@@ -50,6 +56,8 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install ${{ matrix.rust }} toolchain
         uses: dtolnay/rust-toolchain@master
